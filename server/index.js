@@ -9,6 +9,46 @@ const THUMB_DIR = path.resolve(process.env.THUMB_DIR);
 const SIZES = [400, 1600];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+const MONTHS = new Set([
+  'januar', 'februar', 'märz', 'maerz', 'april', 'mai', 'juni', 'juli',
+  'august', 'september', 'oktober', 'november', 'dezember',
+]);
+
+function sanitize(s) {
+  return s.replace(/[:/\\?*"<>|]/g, '').trim().replace(/\s+/g, '_');
+}
+
+function anlassFrom(relPath) {
+  const dir = path.basename(path.dirname(relPath));
+  if (!dir || dir === '.') return '';
+  const rest = dir.replace(/^\s*(?:\d{4}[._-]\d{2}(?:[._-]\d{2})?|\d{1,2}\.\d{1,2}\.\d{2,4}|\d{8})[\s_-]*/, '');
+  const s = sanitize(rest);
+  if (!s || /^\d{4}$/.test(s) || MONTHS.has(s.toLowerCase())) return '';
+  return s;
+}
+
+async function downloadName(row) {
+  if (/^\d{4}-\d{2}-\d{2}-/.test(row.file_name)) return row.file_name;
+  const base = sanitize(path.basename(row.file_name, path.extname(row.file_name)));
+  if (!row.taken_at) return `${base}.jpg`;
+  const anlass = anlassFrom(row.rel_path) || base;
+  const [d, t] = row.taken_at.split(' ');
+  let datePart = d;
+  if (row.date_precision === 'month') datePart = d.slice(0, 7);
+  if (row.date_precision === 'year') datePart = d.slice(0, 4);
+  if (row.date_source === 'exif') {
+    const [h, mi, s] = t.split(':');
+    return `${datePart}-${h}h${mi}m${s}s-${anlass}.jpg`;
+  }
+  const dir = path.dirname(row.rel_path);
+  const prefix = dir === '.' ? '' : dir.replace(/[\\%_]/g, '\\$&') + '/';
+  const [[r]] = await pool.query(
+    'SELECT COUNT(*) AS n FROM photos WHERE rel_path LIKE ? AND rel_path NOT LIKE ? AND file_name < ?',
+    [`${prefix}%`, `${prefix}%/%`, row.file_name],
+  );
+  return `${datePart}-${anlass}-${String(Number(r.n) + 1).padStart(3, '0')}.jpg`;
+}
+
 const app = express();
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
@@ -105,7 +145,7 @@ app.get('/api/photos', async (req, res) => {
 app.get('/api/photos/:id/thumb', async (req, res) => {
   const size = SIZES.includes(Number(req.query.size)) ? Number(req.query.size) : 400;
   const id = parseInt(req.params.id);
-  const [[p]] = await pool.query('SELECT rel_path FROM photos WHERE id = ?', [id]);
+  const [[p]] = await pool.query('SELECT rel_path, file_name, taken_at, date_source, date_precision FROM photos WHERE id = ?', [id]);
   if (!p) return res.sendStatus(404);
   const src = path.resolve(ROOT, p.rel_path);
   if (!src.startsWith(ROOT + path.sep)) return res.sendStatus(400);
@@ -118,6 +158,11 @@ app.get('/api/photos/:id/thumb', async (req, res) => {
     await sharp(src).rotate().resize({ width: size, height: size, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 80 }).toFile(tmp);
     await fs.rename(tmp, out);
   }
+  const enc = encodeURIComponent(await downloadName(p)).replace(
+    /['()*]/g,
+    (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase(),
+  );
+  res.set('Content-Disposition', `inline; filename*=UTF-8''${enc}`);
   res.set('Cache-Control', 'public, max-age=86400');
   res.sendFile(out);
 });

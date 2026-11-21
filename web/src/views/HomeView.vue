@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { usePhotosStore } from '@/stores/photos'
 
 const store = usePhotosStore()
@@ -9,6 +9,61 @@ onMounted(async () => {
   await store.loadTags()
   await store.load()
 })
+
+function step(d) {
+  if (!current.value) return
+  const i = store.photos.findIndex((p) => p.id === current.value.id) + d
+  if (i >= 0 && i < store.photos.length) current.value = store.photos[i]
+  if (i >= store.photos.length - 5 && store.photos.length < store.total && !store.loading) {
+    store.load(false)
+  }
+}
+
+function onKey(e) {
+  if (!current.value) return
+  if (e.key === 'ArrowRight') step(1)
+  else if (e.key === 'ArrowLeft') step(-1)
+  else if (e.key === 'Escape') current.value = null
+}
+
+onMounted(() => window.addEventListener('keydown', onKey))
+onUnmounted(() => window.removeEventListener('keydown', onKey))
+
+const selected = ref(new Set())
+let anchor = null
+
+watch(
+  () => [store.rating, [...store.selectedTags], store.from, store.to],
+  () => {
+    selected.value = new Set()
+    anchor = null
+  },
+)
+
+function select(p, e) {
+  const list = store.photos
+  const s = new Set(selected.value)
+  const idx = list.findIndex((x) => x.id === p.id)
+  if (e.shiftKey && anchor !== null) {
+    const a = list.findIndex((x) => x.id === anchor)
+    const [lo, hi] = a < idx ? [a, idx] : [idx, a]
+    for (let i = lo; i <= hi; i++) s.add(list[i].id)
+  } else {
+    if (s.has(p.id)) s.delete(p.id)
+    else s.add(p.id)
+    anchor = p.id
+  }
+  selected.value = s
+}
+
+function onCardClick(e, p) {
+  if (e.ctrlKey || e.metaKey || e.shiftKey) select(p, e)
+  else current.value = p
+}
+
+function selectAllLoaded() {
+  selected.value = new Set(store.photos.map((p) => p.id))
+}
 
 function fmt(p) {
   if (!p.taken_at) return ''
@@ -68,12 +123,29 @@ function groupOpen(g) {
         </div>
       </details>
       <button class="reset" @click="store.reset()">Filter zurücksetzen</button>
+      <button class="reset" @click="store.allYears()">Alle Jahre</button>
     </aside>
 
     <main>
       <p class="count">{{ store.total }} Fotos</p>
+      <div v-if="selected.size" class="selbar">
+        <strong>{{ selected.size }} ausgewählt</strong>
+        <button @click="selectAllLoaded">Alle geladenen auswählen</button>
+        <button @click="selected = new Set()">Auswahl aufheben</button>
+      </div>
       <div class="grid">
-        <figure v-for="p in store.photos" :key="p.id" @click="current = p">
+        <figure
+          v-for="p in store.photos"
+          :key="p.id"
+          :class="{ selected: selected.has(p.id) }"
+          @click="onCardClick($event, p)"
+        >
+          <input
+            class="sel"
+            type="checkbox"
+            :checked="selected.has(p.id)"
+            @click.stop="select(p, $event)"
+          />
           <img :src="`/api/photos/${p.id}/thumb?size=400`" loading="lazy" :alt="p.file_name" />
           <figcaption>
             <span
@@ -96,6 +168,8 @@ function groupOpen(g) {
     </main>
 
     <div v-if="current" class="overlay" @click="current = null">
+      <button class="nav prev" @click.stop="step(-1)">‹</button>
+      <button class="nav next" @click.stop="step(1)">›</button>
       <img :src="`/api/photos/${current.id}/thumb?size=1600`" :alt="current.file_name" />
       <p>
         {{ current.file_name }} · {{ fmt(current) }} · {{ stars(current.rating) }}<br />
@@ -221,5 +295,62 @@ figcaption {
 .overlay p {
   text-align: center;
   font-size: 0.85rem;
+}
+.nav {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: none;
+  font-size: 3rem;
+  padding: 0.3rem 1rem;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.nav:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+.prev {
+  left: 1rem;
+}
+.next {
+  right: 1rem;
+}
+figure {
+  position: relative;
+  user-select: none;
+}
+.sel {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  opacity: 0.6;
+}
+figure:hover .sel,
+figure.selected .sel {
+  opacity: 1;
+}
+figure.selected {
+  outline: 3px solid #1f3a5f;
+}
+.selbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: #dfe8f5;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  margin-bottom: 0.6rem;
+}
+.selbar button {
+  border: 1px solid #bbb;
+  background: #fafafa;
+  border-radius: 14px;
+  padding: 0.15rem 0.6rem;
+  cursor: pointer;
 }
 </style>

@@ -2,6 +2,9 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 const PAGE = 60
+const YEAR = new Date().getFullYear()
+const DEFAULT_FROM = `${YEAR}-01-01`
+const DEFAULT_TO = `${YEAR}-12-31`
 
 export const usePhotosStore = defineStore('photos', () => {
   const groups = ref([])
@@ -10,8 +13,8 @@ export const usePhotosStore = defineStore('photos', () => {
   const loading = ref(false)
   const rating = ref(0)
   const selectedTags = ref([])
-  const from = ref('')
-  const to = ref('')
+  const from = ref(DEFAULT_FROM)
+  const to = ref(DEFAULT_TO)
   let seq = 0
 
   async function loadTags() {
@@ -55,6 +58,12 @@ export const usePhotosStore = defineStore('photos', () => {
   function reset() {
     rating.value = 0
     selectedTags.value = []
+    from.value = DEFAULT_FROM
+    to.value = DEFAULT_TO
+    load()
+  }
+
+  function allYears() {
     from.value = ''
     to.value = ''
     load()
@@ -74,5 +83,6 @@ export const usePhotosStore = defineStore('photos', () => {
     setRating,
     toggleTag,
     reset,
+    allYears,
   }
 })
