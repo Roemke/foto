@@ -6,6 +6,8 @@ import { RouterLink, RouterView } from 'vue-router'
   <header class="top">
     <RouterLink to="/">Schulfotos</RouterLink>
     <RouterLink to="/upload">Hochladen</RouterLink>
+    <RouterLink to="/admin/tags">Tags verwalten</RouterLink>
+    <RouterLink to="/trash">Papierkorb</RouterLink>
   </header>
   <RouterView />
 </template>
@@ -29,5 +31,13 @@ import { RouterLink, RouterView } from 'vue-router'
 }
 .top a.router-link-exact-active {
   text-decoration: underline;
+}
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  height: 3rem;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 </style>

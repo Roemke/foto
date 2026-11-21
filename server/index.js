@@ -6,6 +6,8 @@ import { ZipArchive } from 'archiver';
 import { pool } from './db.js';
 import { makeUploadRouter } from './upload.js';
 import { makeEditRouter } from './edit.js';
+import { makeAdminRouter } from './admin.js';
+import { makeTrashRouter } from './trash.js';
 
 const ROOT = path.resolve(process.env.PHOTO_ROOT);
 const THUMB_DIR = path.resolve(process.env.THUMB_DIR);
@@ -57,6 +59,8 @@ const app = express();
 
 app.use('/api/upload', makeUploadRouter(pool));
 app.use('/api/edit', makeEditRouter(pool));
+app.use('/api/admin', makeAdminRouter(pool));
+app.use('/api/trash', makeTrashRouter(pool));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

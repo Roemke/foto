@@ -15,11 +15,53 @@ const editPhotos = computed(() => {
 function openEdit(ids) {
   if (ids.length) editIds.value = ids
 }
-async function onSaved({ ids, rating, adds, removes }) {
+async function trashPhotos(ids) {
+  if (!ids.length) return
+  const msg =
+    ids.length === 1
+      ? 'Dieses Foto in den Papierkorb verschieben?'
+      : `${ids.length} Fotos in den Papierkorb verschieben?`
+  if (!confirm(msg)) return
+  const r = await fetch('/api/trash', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  })
+  const j = await r.json().catch(() => ({}))
+  if (!r.ok) {
+    alert(j.error || 'Fehler beim Löschen')
+    return
+  }
+  const failed = new Set((j.failed ?? []).map((f) => f.id))
+  const gone = new Set(ids.filter((id) => !failed.has(id)))
+  if (current.value && gone.has(current.value.id)) {
+    const i = store.photos.findIndex((x) => x.id === current.value.id)
+    const after = store.photos.slice(i + 1).find((x) => !gone.has(x.id))
+    const before = store.photos
+      .slice(0, i)
+      .reverse()
+      .find((x) => !gone.has(x.id))
+    current.value = after ?? before ?? null
+  }
+  store.photos = store.photos.filter((x) => !gone.has(x.id))
+  store.total = Math.max(0, store.total - gone.size)
+  selected.value = new Set([...selected.value].filter((id) => !gone.has(id)))
+  store.loadTags()
+  if (failed.size)
+    alert(`${failed.size} Foto(s) konnten nicht verschoben werden: ${j.failed[0].error}`)
+}
+async function onSaved({ ids, rating, date, adds, removes }) {
   const set = new Set(ids)
   for (const p of store.photos) {
     if (!set.has(p.id)) continue
     if (rating !== undefined) p.rating = rating || null
+    if (date) {
+      const certain = p.date_source === 'exif' || p.date_source === 'manual'
+      const tm = certain && p.taken_at ? p.taken_at.slice(11) : '00:00:00'
+      p.taken_at = `${date} ${tm}`
+      p.date_source = 'manual'
+      p.date_precision = 'day'
+    }
     p.tags = (p.tags ?? []).filter(
       (x) => !removes.some((r) => r.group === x.group && r.name === x.name),
     )
@@ -272,6 +314,9 @@ function groupOpen(g) {
           <button @click="selectAllLoaded">Alle geladenen auswählen</button>
           <button :disabled="!selected.size" @click="selected = new Set()">Auswahl aufheben</button>
           <button :disabled="!selected.size" @click="downloadZip">Als ZIP herunterladen</button>
+          <button class="danger" :disabled="!selected.size" @click="trashPhotos([...selected])">
+            Löschen
+          </button>
           <button :disabled="!selected.size" @click="openEdit([...selected])">Bearbeiten …</button>
         </span>
       </p>
@@ -319,6 +364,7 @@ function groupOpen(g) {
       <div class="tools" @click.stop>
         <button @click="showInfo = !showInfo">ⓘ Info</button>
         <button @click="openEdit([current.id])">✎ Bearbeiten</button>
+        <button @click="trashPhotos([current.id])">Löschen</button>
         <a class="btn" :href="`/api/photos/${current.id}/original`">Original herunterladen</a>
         <button @click="current = null">✕</button>
       </div>
@@ -369,8 +415,8 @@ function groupOpen(g) {
   padding: 0.8rem;
   border-radius: 6px;
   position: sticky;
-  top: 0.5rem;
-  max-height: calc(100vh - 1rem);
+  top: 3.5rem;
+  max-height: calc(100vh - 4rem);
   overflow-y: auto;
 }
 .filters h2,
@@ -755,7 +801,6 @@ figure {
     box-shadow 0.15s;
 }
 figure:hover {
-  transform: translateY(-2px);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
 }
 
@@ -770,5 +815,9 @@ figure:hover {
 .chips.rating button {
   text-align: center;
   padding: 0.3rem 0;
+}
+
+.selbar button.danger {
+  color: #9b1c10;
 }
 </style>

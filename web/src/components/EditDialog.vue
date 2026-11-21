@@ -7,6 +7,9 @@ const emit = defineEmits(['close', 'saved'])
 const groups = ref([])
 const state = ref({})
 const rating = ref(null)
+const date = ref('')
+const photographer = ref('')
+const clearPhotog = ref(false)
 const busy = ref(false)
 const error = ref('')
 const warn = ref('')
@@ -80,7 +83,13 @@ function collect(kind) {
 const adds = computed(() => collect('add'))
 const removes = computed(() => collect('remove'))
 const changed = computed(
-  () => rating.value !== null || adds.value.length > 0 || removes.value.length > 0,
+  () =>
+    rating.value !== null ||
+    adds.value.length > 0 ||
+    removes.value.length > 0 ||
+    !!date.value ||
+    !!photographer.value.trim() ||
+    clearPhotog.value,
 )
 
 async function save() {
@@ -93,6 +102,9 @@ async function save() {
     removeTags: removes.value.map((t) => t.id),
   }
   if (rating.value !== null) body.rating = rating.value
+  if (date.value) body.date = date.value
+  if (clearPhotog.value) body.photographer = null
+  else if (photographer.value.trim()) body.photographer = photographer.value.trim()
   try {
     const r = await fetch('/api/edit', {
       method: 'POST',
@@ -106,6 +118,7 @@ async function save() {
       emit('saved', {
         ids: body.ids,
         rating: rating.value === null ? undefined : rating.value,
+        date: date.value || undefined,
         adds: adds.value,
         removes: removes.value,
       })
@@ -141,6 +154,19 @@ async function save() {
         >
           {{ o.l }}
         </button>
+      </div>
+
+      <h3>Aufnahmedatum <small>(leer = unverändert)</small></h3>
+      <div class="row">
+        <input v-model="date" type="date" />
+      </div>
+
+      <h3>Fotograf <small>(leer = unverändert)</small></h3>
+      <div class="row">
+        <input v-model="photographer" :disabled="clearPhotog" placeholder="Name" />
+        <label class="chk"
+          ><input v-model="clearPhotog" type="checkbox" /> Fotograf entfernen</label
+        >
       </div>
 
       <h3>Tags <small>(Klick wechselt: hinzufügen +, entfernen −, unverändert)</small></h3>
@@ -290,5 +316,19 @@ footer .go:disabled {
 }
 .err {
   color: #b42318;
+}
+.row input:not([type='checkbox']) {
+  border: 1px solid #d9dde5;
+  border-radius: 8px;
+  padding: 0.3rem 0.5rem;
+  font: inherit;
+  font-size: 0.85rem;
+}
+.chk {
+  font-size: 0.85rem;
+  color: #4b5563;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 </style>
