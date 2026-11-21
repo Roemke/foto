@@ -20,10 +20,19 @@ function step(d) {
 }
 
 function onKey(e) {
-  if (!current.value) return
-  if (e.key === 'ArrowRight') step(1)
-  else if (e.key === 'ArrowLeft') step(-1)
-  else if (e.key === 'Escape') current.value = null
+  if (current.value) {
+    if (e.key === 'ArrowRight') step(1)
+    else if (e.key === 'ArrowLeft') step(-1)
+    else if (e.key === 'Escape') current.value = null
+    return
+  }
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+    e.preventDefault()
+    selectAllLoaded()
+  } else if (e.key === 'Escape') {
+    selected.value = new Set()
+  }
 }
 
 onMounted(() => window.addEventListener('keydown', onKey))
@@ -40,25 +49,52 @@ watch(
   },
 )
 
-function select(p, e) {
+function range(p) {
   const list = store.photos
-  const s = new Set(selected.value)
   const idx = list.findIndex((x) => x.id === p.id)
-  if (e.shiftKey && anchor !== null) {
-    const a = list.findIndex((x) => x.id === anchor)
-    const [lo, hi] = a < idx ? [a, idx] : [idx, a]
-    for (let i = lo; i <= hi; i++) s.add(list[i].id)
-  } else {
+  const a = list.findIndex((x) => x.id === anchor)
+  const [lo, hi] = a < 0 ? [idx, idx] : a < idx ? [a, idx] : [idx, a]
+  return list.slice(lo, hi + 1).map((x) => x.id)
+}
+
+function select(p, e) {
+  let s
+  if (e.shiftKey) {
+    s = new Set(range(p))
+    if (anchor === null) anchor = p.id
+  } else if (e.ctrlKey || e.metaKey) {
+    s = new Set(selected.value)
     if (s.has(p.id)) s.delete(p.id)
     else s.add(p.id)
+    anchor = p.id
+  } else if (selected.value.has(p.id)) {
+    s = new Set(selected.value)
+    s.delete(p.id)
+    anchor = p.id
+  } else {
+    s = new Set([p.id])
     anchor = p.id
   }
   selected.value = s
 }
 
-function onCardClick(e, p) {
-  if (e.ctrlKey || e.metaKey || e.shiftKey) select(p, e)
-  else current.value = p
+function downloadZip() {
+  if (!selected.value.size) return
+  if (selected.value.size > 500) {
+    alert('Maximal 500 Fotos pro ZIP-Datei.')
+    return
+  }
+  const f = document.createElement('form')
+  f.method = 'POST'
+  f.action = '/api/download'
+  const i = document.createElement('input')
+  i.type = 'hidden'
+  i.name = 'ids'
+  i.value = [...selected.value].join(',')
+  f.appendChild(i)
+  document.body.appendChild(f)
+  f.submit()
+  f.remove()
 }
 
 function selectAllLoaded() {
@@ -126,27 +162,27 @@ function groupOpen(g) {
       <button class="reset" @click="store.allYears()">Alle Jahre</button>
     </aside>
 
-    <main>
-      <p class="count">{{ store.total }} Fotos</p>
-      <div v-if="selected.size" class="selbar">
-        <strong>{{ selected.size }} ausgewählt</strong>
-        <button @click="selectAllLoaded">Alle geladenen auswählen</button>
-        <button @click="selected = new Set()">Auswahl aufheben</button>
-      </div>
-      <div class="grid">
-        <figure
-          v-for="p in store.photos"
-          :key="p.id"
-          :class="{ selected: selected.has(p.id) }"
-          @click="onCardClick($event, p)"
-        >
-          <input
-            class="sel"
-            type="checkbox"
-            :checked="selected.has(p.id)"
-            @click.stop="select(p, $event)"
+    <main @click.self="selected = new Set()">
+      <p class="count">
+        {{ store.total }} Fotos
+        <span class="selbar" :class="{ idle: !selected.size }">
+          <strong>{{ selected.size }} ausgewählt</strong>
+          <button @click="selectAllLoaded">Alle geladenen auswählen</button>
+          <button :disabled="!selected.size" @click="selected = new Set()">Auswahl aufheben</button>
+          <button :disabled="!selected.size" @click="downloadZip">Als ZIP herunterladen</button>
+        </span>
+      </p>
+      <div class="grid" @click.self="selected = new Set()">
+        <figure v-for="p in store.photos" :key="p.id" :class="{ selected: selected.has(p.id) }">
+          <span class="sel" :class="{ on: selected.has(p.id) }" @click.stop="select(p, $event)">{{
+            selected.has(p.id) ? '✓' : ''
+          }}</span>
+          <img
+            :src="`/api/photos/${p.id}/thumb?size=400`"
+            loading="lazy"
+            @click="current = p"
+            :alt="p.file_name"
           />
-          <img :src="`/api/photos/${p.id}/thumb?size=400`" loading="lazy" :alt="p.file_name" />
           <figcaption>
             <span
               :class="{ unsure: !certain(p) }"
@@ -352,5 +388,39 @@ figure.selected {
   border-radius: 14px;
   padding: 0.15rem 0.6rem;
   cursor: pointer;
+}
+.sel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid #fff;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  opacity: 1;
+}
+.sel.on {
+  background: #1f3a5f;
+}
+.count {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.selbar {
+  margin-bottom: 0;
+  font-size: 0.85rem;
+}
+.selbar.idle {
+  background: #eceef1;
+  color: #8a8f98;
+}
+.selbar button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 </style>
