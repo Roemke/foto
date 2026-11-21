@@ -10,3 +10,25 @@ body {
   background: #f3f4f6;
   color: #1f2937;
 }
+
+.legal {
+  max-width: 46rem;
+  margin: 1.5rem auto;
+  padding: 0 1rem;
+  line-height: 1.55;
+}
+.legal h1 {
+  margin-bottom: 0.2rem;
+}
+.legal h2 {
+  margin-top: 1.6rem;
+  font-size: 1.1rem;
+}
+.legal h3 {
+  margin: 1rem 0 0.2rem;
+  font-size: 0.95rem;
+}
+.legal .stand {
+  color: #666;
+  margin-top: 0;
+}

@@ -425,7 +425,7 @@ function groupOpen(g) {
   border-radius: 6px;
   position: sticky;
   top: 3.5rem;
-  max-height: calc(100vh - 4rem);
+  max-height: calc(100vh - 6.5rem);
   overflow-y: auto;
 }
 .filters h2,
