@@ -9,6 +9,7 @@ CREATE TABLE photos (
   file_mtime    DATETIME NULL,
   taken_at      DATETIME NULL,
   date_source   ENUM('exif','filename','folder','mtime','manual','unknown') NOT NULL DEFAULT 'unknown',
+  date_precision ENUM('day','month','year') NOT NULL DEFAULT 'day',
   rating        TINYINT UNSIGNED NULL,
   photographer  VARCHAR(100) NULL,
   indexed_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -29,6 +30,7 @@ CREATE TABLE tags (
   group_id  INT UNSIGNED NOT NULL,
   name      VARCHAR(150) NOT NULL,
   active    TINYINT(1) NOT NULL DEFAULT 1,
+  legacy    TINYINT(1) NOT NULL DEFAULT 0,
   UNIQUE KEY uq_group_name (group_id, name),
   FOREIGN KEY (group_id) REFERENCES tag_groups(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

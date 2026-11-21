@@ -1,0 +1,116 @@
+Abteilung
+  BFS
+    D-Stücke
+    Gesellenstück
+    Glaserei
+    Gravur
+    Schleiferei
+  BGYM
+  FOS
+  GTAG
+  GTAM
+  LBS
+Event
+  Abschlussfeiern
+  Anmeldung und Beratungstag
+  Ausstellungen
+  Berufsorientierung
+  Einschulung
+  Exkursion
+  Extern
+  Feiern
+  Intern
+  Klassenfahrt
+  Messen
+  Orientierungstage
+  Preisverleihung
+  Schüleraustausch
+  Studienorientierung
+  Tag der offenen Tür
+  Weihnachtsfeiern
+  Workshop
+Klasse
+  AG21a
+  AG21b
+  AG22a
+  AG22b
+  AG22z
+  AG23a
+  AG23b
+  AG23Z
+  AM21
+  AM22
+  AM23
+  BF21
+  BF22
+  BF23a
+  BF23b
+  BF24
+  BG19
+  BG20
+  BG21
+  BG22
+  BG23
+  FH23
+  FH25
+  FM23
+  GF21
+  GF22
+  GF23
+  GF24
+  GH21
+  GH22
+  GH23
+  GH24
+  GV21
+  GV22a
+  GV22b
+  GV23a
+  GV23b
+  GV24a
+  GV24b
+Ort
+  andere Orte
+  Mensa
+  Schule außen
+  Schule innen
+  Sporthalle
+Schuljahr
+  2021/22
+  2022/23
+  2023/24
+  2024/25
+  2025/26
+  2026/27
+Thema
+  Austausch
+  Digitales
+  EU
+  Interkulturell
+  Klassenfotos
+  Kooperationen
+  Kundenaufträge
+  Menschen
+  Multimedia
+  Nachhaltigkeit
+  Preise
+  Projekte
+  Schülerarbeiten
+  Schülerfotos
+  Wettbewerbe
+Unterricht
+  Classroommanagement
+  DIFF-Kurs
+  Gesellschaftswissenschaften
+  Gestaltungsfächer
+  Klassenarbeit
+  Lernatmosphäre
+  Lernaufgabe
+  MINT
+  Praktikum
+  Sonstiges
+  Sprachen
+Veröffentlicht
+  Homepage
+  Presse
+  Social Media
