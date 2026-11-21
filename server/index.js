@@ -8,6 +8,8 @@ import { makeUploadRouter } from './upload.js';
 import { makeEditRouter } from './edit.js';
 import { makeAdminRouter } from './admin.js';
 import { makeTrashRouter } from './trash.js';
+import { makeAuth, sessionMiddleware } from './auth.js';
+import { makeUsersRouter } from './users.js';
 
 const ROOT = path.resolve(process.env.PHOTO_ROOT);
 const THUMB_DIR = path.resolve(process.env.THUMB_DIR);
@@ -57,12 +59,18 @@ async function downloadName(row) {
 
 const app = express();
 
-app.use('/api/upload', makeUploadRouter(pool));
-app.use('/api/edit', makeEditRouter(pool));
-app.use('/api/admin', makeAdminRouter(pool));
-app.use('/api/trash', makeTrashRouter(pool));
-
+app.set('trust proxy', 1);
+app.use(sessionMiddleware);
+const { router: authRouter, requireLogin, requireAdmin } = makeAuth(pool);
+app.use('/api/auth', authRouter);
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+app.use('/api', requireLogin);
+app.use('/api/upload', makeUploadRouter(pool));
+app.use('/api/edit', requireAdmin, makeEditRouter(pool));
+app.use('/api/admin', requireAdmin, makeAdminRouter(pool));
+app.use('/api/trash', requireAdmin, makeTrashRouter(pool));
+app.use('/api/users', requireAdmin, makeUsersRouter(pool));
+
 
 function filterParts(q) {
   const where = [];

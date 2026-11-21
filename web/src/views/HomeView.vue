@@ -2,8 +2,10 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { usePhotosStore } from '@/stores/photos'
 import EditDialog from '@/components/EditDialog.vue'
+import { useAuth } from '@/stores/auth'
 
 const store = usePhotosStore()
+const auth = useAuth()
 const current = ref(null)
 
 const editIds = ref(null)
@@ -314,10 +316,17 @@ function groupOpen(g) {
           <button @click="selectAllLoaded">Alle geladenen auswählen</button>
           <button :disabled="!selected.size" @click="selected = new Set()">Auswahl aufheben</button>
           <button :disabled="!selected.size" @click="downloadZip">Als ZIP herunterladen</button>
-          <button class="danger" :disabled="!selected.size" @click="trashPhotos([...selected])">
+          <button
+            v-if="auth.isAdmin"
+            class="danger"
+            :disabled="!selected.size"
+            @click="trashPhotos([...selected])"
+          >
             Löschen
           </button>
-          <button :disabled="!selected.size" @click="openEdit([...selected])">Bearbeiten …</button>
+          <button v-if="auth.isAdmin" :disabled="!selected.size" @click="openEdit([...selected])">
+            Bearbeiten …
+          </button>
         </span>
       </p>
       <div class="grid" @click.self="selected = new Set()">
@@ -363,8 +372,8 @@ function groupOpen(g) {
       <button class="nav next" @click.stop="step(1)">›</button>
       <div class="tools" @click.stop>
         <button @click="showInfo = !showInfo">ⓘ Info</button>
-        <button @click="openEdit([current.id])">✎ Bearbeiten</button>
-        <button @click="trashPhotos([current.id])">Löschen</button>
+        <button v-if="auth.isAdmin" @click="openEdit([current.id])">✎ Bearbeiten</button>
+        <button v-if="auth.isAdmin" @click="trashPhotos([current.id])">Löschen</button>
         <a class="btn" :href="`/api/photos/${current.id}/original`">Original herunterladen</a>
         <button @click="current = null">✕</button>
       </div>
