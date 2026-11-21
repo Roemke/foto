@@ -10,6 +10,7 @@ import { makeAdminRouter } from './admin.js';
 import { makeTrashRouter } from './trash.js';
 import { makeAuth, sessionMiddleware } from './auth.js';
 import { makeUsersRouter } from './users.js';
+import { makeSyncRouter } from './sync-route.js';
 
 const ROOT = path.resolve(process.env.PHOTO_ROOT);
 const THUMB_DIR = path.resolve(process.env.THUMB_DIR);
@@ -70,6 +71,7 @@ app.use('/api/edit', requireAdmin, makeEditRouter(pool));
 app.use('/api/admin', requireAdmin, makeAdminRouter(pool));
 app.use('/api/trash', requireAdmin, makeTrashRouter(pool));
 app.use('/api/users', requireAdmin, makeUsersRouter(pool));
+app.use('/api/sync', requireAdmin, makeSyncRouter(pool));
 
 
 function filterParts(q) {

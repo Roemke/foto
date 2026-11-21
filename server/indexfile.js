@@ -16,9 +16,16 @@ const SQL = `INSERT INTO photos
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON DUPLICATE KEY UPDATE width = VALUES(width), height = VALUES(height),
     file_size = VALUES(file_size), file_mtime = VALUES(file_mtime)`;
+const REFRESH_SQL = `INSERT INTO photos
+  (rel_path, file_name, width, height, file_size, file_mtime, taken_at, date_source, date_precision, rating, photographer)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), width = VALUES(width), height = VALUES(height),
+    file_size = VALUES(file_size), file_mtime = VALUES(file_mtime), taken_at = VALUES(taken_at),
+    date_source = VALUES(date_source), date_precision = VALUES(date_precision),
+    rating = VALUES(rating), photographer = VALUES(photographer)`;
 const list = (v) => (v == null ? [] : Array.isArray(v) ? v : [v]);
 
-export async function indexFiles(pool, rels) {
+export async function indexFiles(pool, rels, opts = {}) {
   const tagCache = await loadTagCache(pool);
   const abs = rels.map((r) => path.join(ROOT, r));
   let out;
@@ -39,6 +46,7 @@ export async function indexFiles(pool, rels) {
     try {
       const file = path.join(ROOT, rel);
       const it = meta.get(path.resolve(file)) ?? {};
+      if (opts.refresh && !meta.has(path.resolve(file))) throw new Error('exiftool lieferte keine Daten');
       const st = await fs.stat(file);
       const name = path.basename(rel);
       let taken = fromExif(it.DateTimeOriginal) ?? fromExif(it.CreateDate);
@@ -61,11 +69,12 @@ export async function indexFiles(pool, rels) {
       }
       const rating = Number(it.Rating) > 0 ? Number(it.Rating) : null;
       const photographer = String(list(it.Creator)[0] ?? '').slice(0, 100) || null;
-      const [res] = await pool.query(SQL, [
+      const [res] = await pool.query(opts.refresh ? REFRESH_SQL : SQL, [
         rel, name, it.ImageWidth ?? null, it.ImageHeight ?? null,
         st.size, st.mtime, taken, src, prec, rating, photographer,
       ]);
-      if (res.affectedRows === 1) {
+      if (opts.refresh || res.affectedRows === 1) {
+        if (opts.refresh) await pool.query('DELETE FROM photo_tags WHERE photo_id = ?', [res.insertId]);
         const entries = parseKeywords(
           list(it.HierarchicalSubject),
           it.Subject != null ? list(it.Subject) : list(it.Keywords),

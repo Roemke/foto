@@ -1,0 +1,10 @@
+[Unit]
+Description=Schulfotos: Archiv-Abgleich (Platte <-> Datenbank, Nextcloud-Scan)
+After=network.target mariadb.service
+
+[Service]
+Type=oneshot
+# ANPASSEN: Benutzer, Pfad zum Projekt und Pfad zu node (auf dem Server: which node)
+User=www-data
+WorkingDirectory=/opt/fotos/server
+ExecStart=/usr/bin/node --env-file=.env sync-cli.js

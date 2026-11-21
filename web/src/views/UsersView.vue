@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 
 const users = ref([])
 const email = ref('')
@@ -29,7 +29,31 @@ async function add() {
 
 const fmt = (d) => (d ? new Date(d).toLocaleString('de-DE') : 'noch nie')
 
-onMounted(load)
+const sync = ref({ running: false, last: null })
+let timer = null
+
+async function loadSync() {
+  const r = await fetch('/api/sync')
+  if (r.ok) sync.value = await r.json()
+  if (sync.value.running && !timer) timer = setInterval(loadSync, 3000)
+  if (!sync.value.running && timer) {
+    clearInterval(timer)
+    timer = null
+  }
+}
+
+async function startSync(dry) {
+  error.value = ''
+  const r = await fetch('/api/sync' + (dry ? '?dry=1' : ''), { method: 'POST' })
+  if (!r.ok) error.value = (await r.json()).error || 'Fehler'
+  await loadSync()
+}
+
+onMounted(() => {
+  load()
+  loadSync()
+})
+onUnmounted(() => clearInterval(timer))
 </script>
 
 <template>
@@ -71,6 +95,21 @@ onMounted(load)
         </tr>
       </tbody>
     </table>
+    <h2>Archiv-Abgleich</h2>
+    <p class="hint">
+      Gleicht die Fotos auf der Platte mit der Datenbank ab: neue Dateien einlesen, geänderte neu
+      einlesen (die Datei gewinnt), fehlende entfernen.
+    </p>
+    <div class="add">
+      <button :disabled="sync.running" @click="startSync(true)">Nur prüfen</button>
+      <button :disabled="sync.running" @click="startSync(false)">Jetzt abgleichen</button>
+    </div>
+    <p v-if="sync.running">Läuft …</p>
+    <div v-else-if="sync.last">
+      <p>Zuletzt beendet: {{ fmt(sync.last.finished) }}</p>
+      <p v-if="sync.last.error" class="err">{{ sync.last.error }}</p>
+      <pre v-else>{{ JSON.stringify(sync.last.result, null, 2) }}</pre>
+    </div>
   </main>
 </template>
 
