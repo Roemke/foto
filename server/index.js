@@ -115,7 +115,7 @@ app.get('/api/photos/:id/thumb', async (req, res) => {
   } catch {
     await fs.mkdir(path.dirname(out), { recursive: true });
     const tmp = `${out}.${Math.random().toString(36).slice(2)}.tmp`;
-    await sharp(src).rotate().resize({ width: size, withoutEnlargement: true }).jpeg({ quality: 80 }).toFile(tmp);
+    await sharp(src).rotate().resize({ width: size, height: size, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 80 }).toFile(tmp);
     await fs.rename(tmp, out);
   }
   res.set('Cache-Control', 'public, max-age=86400');
