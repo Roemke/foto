@@ -2,11 +2,13 @@ import express from 'express';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
+import { ZipArchive } from 'archiver';
 import { pool } from './db.js';
 
 const ROOT = path.resolve(process.env.PHOTO_ROOT);
 const THUMB_DIR = path.resolve(process.env.THUMB_DIR);
 const SIZES = [400, 1600];
+const MAX_ZIP = Number(process.env.MAX_ZIP) || 500;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const MONTHS = new Set([
@@ -53,21 +55,80 @@ const app = express();
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+function filterParts(q) {
+  const where = [];
+  const params = [];
+  const minRating = parseInt(q.rating);
+  if (minRating >= 1 && minRating <= 5) {
+    where.push('p.rating >= ?');
+    params.push(minRating);
+  }
+  const minWidth = parseInt(q.minWidth) || 0;
+  if (minWidth > 0) {
+    where.push('p.width >= ?');
+    params.push(minWidth);
+  }
+  if (DATE_RE.test(q.from ?? '')) {
+    where.push('p.taken_at >= ?');
+    params.push(`${q.from} 00:00:00`);
+  }
+  if (DATE_RE.test(q.to ?? '')) {
+    where.push('p.taken_at < DATE_ADD(?, INTERVAL 1 DAY)');
+    params.push(q.to);
+  }
+  return { where, params };
+}
+
 app.get('/api/tags', async (req, res) => {
-  const [rows] = await pool.query(
-    `SELECT g.id AS gid, g.name AS gname, t.id AS tid, t.name AS tname, t.legacy, COUNT(pt.photo_id) AS n
-     FROM tag_groups g
-     JOIN tags t ON t.group_id = g.id
-     LEFT JOIN photo_tags pt ON pt.tag_id = t.id
+  const { where, params } = filterParts(req.query);
+  const cond = where.length ? ` AND ${where.join(' AND ')}` : '';
+  const selected = new Set(
+    String(req.query.tags ?? '')
+      .split(',')
+      .map(Number)
+      .filter((n) => Number.isInteger(n) && n > 0),
+  );
+
+  const [meta] = await pool.query(
+    `SELECT g.id AS gid, g.name AS gname, t.id AS tid, t.name AS tname, t.legacy
+     FROM tag_groups g JOIN tags t ON t.group_id = g.id
      WHERE g.visible = 1 AND t.active = 1
-     GROUP BY t.id
      ORDER BY g.sort, g.id, t.name`,
   );
+  const selByGroup = new Map();
+  for (const m of meta) {
+    if (!selected.has(m.tid)) continue;
+    if (!selByGroup.has(m.gid)) selByGroup.set(m.gid, []);
+    selByGroup.get(m.gid).push(m.tid);
+  }
+
+  const gids = [...new Set(meta.map((m) => m.gid))];
+  const counts = new Map();
+  await Promise.all(
+    gids.map(async (gid) => {
+      const others = [...selByGroup.entries()].filter(([g]) => g !== gid).map(([, ids]) => ids);
+      const extra = others
+        .map(() => ' AND EXISTS (SELECT 1 FROM photo_tags x WHERE x.photo_id = p.id AND x.tag_id IN (?))')
+        .join('');
+      const [rows] = await pool.query(
+        `SELECT t.id, COUNT(p.id) AS n
+         FROM tags t
+         LEFT JOIN photo_tags pt ON pt.tag_id = t.id
+         LEFT JOIN photos p ON p.id = pt.photo_id${cond}${extra}
+         WHERE t.group_id = ? AND t.active = 1
+         GROUP BY t.id`,
+        [...params, ...others, gid],
+      );
+      for (const r of rows) counts.set(r.id, Number(r.n));
+    }),
+  );
+
   const groups = new Map();
-  for (const r of rows) {
-    if (r.legacy && r.n === 0) continue;
-    if (!groups.has(r.gid)) groups.set(r.gid, { id: r.gid, name: r.gname, tags: [] });
-    groups.get(r.gid).tags.push({ id: r.tid, name: r.tname, count: Number(r.n), legacy: !!r.legacy });
+  for (const m of meta) {
+    const n = counts.get(m.tid) ?? 0;
+    if (m.legacy && n === 0 && !selected.has(m.tid)) continue;
+    if (!groups.has(m.gid)) groups.set(m.gid, { id: m.gid, name: m.gname, tags: [] });
+    groups.get(m.gid).tags.push({ id: m.tid, name: m.tname, count: n, legacy: !!m.legacy });
   }
   res.json([...groups.values()]);
 });
@@ -165,6 +226,71 @@ app.get('/api/photos/:id/thumb', async (req, res) => {
   res.set('Content-Disposition', `inline; filename*=UTF-8''${enc}`);
   res.set('Cache-Control', 'public, max-age=86400');
   res.sendFile(out);
+});
+
+app.get('/api/photos/:id', async (req, res) => {
+  const [[p]] = await pool.query(
+    `SELECT id, rel_path, file_name, width, height, file_size, taken_at, date_source, date_precision, rating, photographer
+     FROM photos WHERE id = ?`,
+    [parseInt(req.params.id)],
+  );
+  if (!p) return res.sendStatus(404);
+  res.json(p);
+});
+
+app.get('/api/photos/:id/original', async (req, res) => {
+  const [[p]] = await pool.query(
+    'SELECT rel_path, file_name, taken_at, date_source, date_precision FROM photos WHERE id = ?',
+    [parseInt(req.params.id)],
+  );
+  if (!p) return res.sendStatus(404);
+  const src = path.resolve(ROOT, p.rel_path);
+  if (!src.startsWith(ROOT + path.sep)) return res.sendStatus(400);
+  res.download(src, await downloadName(p), { dotfiles: 'allow' });
+});
+
+app.post('/api/download', express.urlencoded({ extended: false, limit: '1mb' }), async (req, res) => {
+  const ids = String(req.body?.ids ?? '')
+    .split(',')
+    .map(Number)
+    .filter((n) => Number.isInteger(n) && n > 0);
+  if (!ids.length) return res.sendStatus(400);
+  if (ids.length > MAX_ZIP) return res.status(413).send(`Maximal ${MAX_ZIP} Fotos pro ZIP-Datei.`);
+
+  const [rows] = await pool.query(
+    `SELECT id, rel_path, file_name, taken_at, date_source, date_precision
+     FROM photos WHERE id IN (?) ORDER BY taken_at, id`,
+    [ids],
+  );
+  const today = new Date().toISOString().slice(0, 10);
+  res.set('Content-Type', 'application/zip');
+  res.set('Content-Disposition', `attachment; filename="Schulfotos-${today}.zip"`);
+
+  const archive = new ZipArchive({ zlib: { level: 0 } });
+  archive.on('warning', (e) => console.warn('ZIP:', e.message));
+  archive.on('error', (e) => {
+    console.error('ZIP:', e);
+    res.destroy(e);
+  });
+  archive.pipe(res);
+
+  const used = new Set();
+  for (const row of rows) {
+    const src = path.resolve(ROOT, row.rel_path);
+    if (!src.startsWith(ROOT + path.sep)) continue;
+    const name = await downloadName(row);
+    const ext = path.extname(name);
+    const stem = name.slice(0, name.length - ext.length);
+    let cand = name;
+    let k = 0;
+    while (used.has(cand.toLowerCase())) {
+      k++;
+      cand = `${stem}-${k}${ext}`;
+    }
+    used.add(cand.toLowerCase());
+    archive.file(src, { name: cand });
+  }
+  await archive.finalize();
 });
 
 app.listen(3000, '127.0.0.1', () => console.log('API auf Port 3000'));

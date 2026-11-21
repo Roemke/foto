@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { usePhotosStore } from '@/stores/photos'
 
 const store = usePhotosStore()
@@ -24,6 +24,7 @@ function onKey(e) {
     if (e.key === 'ArrowRight') step(1)
     else if (e.key === 'ArrowLeft') step(-1)
     else if (e.key === 'Escape') current.value = null
+    else if (e.key === 'i' || e.key === 'I') showInfo.value = !showInfo.value
     return
   }
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return
@@ -101,6 +102,63 @@ function selectAllLoaded() {
   selected.value = new Set(store.photos.map((p) => p.id))
 }
 
+const activeTags = computed(() =>
+  store.groups.flatMap((g) =>
+    g.tags
+      .filter((t) => store.selectedTags.includes(t.id))
+      .map((t) => ({ id: t.id, name: t.name, group: g.name })),
+  ),
+)
+
+function selCount(g) {
+  return g.tags.filter((t) => store.selectedTags.includes(t.id)).length
+}
+
+const showInfo = ref(false)
+const info = ref(null)
+
+watch([current, showInfo], async () => {
+  info.value = null
+  if (!current.value || !showInfo.value) return
+  const id = current.value.id
+  const r = await fetch(`/api/photos/${id}`)
+  const data = await r.json()
+  if (current.value && current.value.id === id) info.value = data
+})
+
+function folderOf(rel) {
+  const i = rel.lastIndexOf('/')
+  return i < 0 ? '(oberster Ordner)' : rel.slice(0, i)
+}
+
+function mb(n) {
+  return n ? (n / 1048576).toFixed(1) : '?'
+}
+
+function sourceText(p) {
+  const prec = { year: 'nur Jahr', month: 'nur Monat', day: '' }[p.date_precision]
+  switch (p.date_source) {
+    case 'exif':
+      return 'aus den Bilddaten'
+    case 'filename':
+      return 'aus dem Dateinamen, unsicher'
+    case 'folder':
+      return `aus dem Ordnernamen${prec ? ', ' + prec : ''}, unsicher`
+    case 'mtime':
+      return 'Dateidatum, unsicher'
+    case 'manual':
+      return 'manuell eingetragen'
+    default:
+      return 'unbekannt'
+  }
+}
+
+function tagsByGroup(p) {
+  const m = {}
+  for (const t of p.tags ?? []) (m[t.group] ??= []).push(t.name)
+  return m
+}
+
 function fmt(p) {
   if (!p.taken_at) return ''
   const [y, m, d] = p.taken_at.split(' ')[0].split('-')
@@ -126,9 +184,18 @@ function groupOpen(g) {
   <div class="layout">
     <aside class="filters">
       <h2>Filter</h2>
+      <div class="resets">
+        <button class="reset" @click="store.reset()">Filter zurücksetzen</button>
+        <button class="reset" @click="store.allYears()">Alle Jahre</button>
+      </div>
+      <div v-if="activeTags.length" class="active">
+        <button v-for="t in activeTags" :key="t.id" @click="store.toggleTag(t.id)">
+          {{ t.group }}: {{ t.name }} ✕
+        </button>
+      </div>
       <section>
         <h3>Sterne</h3>
-        <div class="chips">
+        <div class="chips rating">
           <button :class="{ on: store.rating === 0 }" @click="store.setRating(0)">alle</button>
           <button
             v-for="n in [5, 4, 3, 2, 1]"
@@ -142,24 +209,34 @@ function groupOpen(g) {
       </section>
       <section>
         <h3>Zeitraum</h3>
-        <label>von <input v-model="store.from" type="date" @change="store.load()" /></label>
-        <label>bis <input v-model="store.to" type="date" @change="store.load()" /></label>
+        <div class="range">
+          <input v-model="store.from" type="date" @change="store.load()" />
+          <span>–</span>
+          <input v-model="store.to" type="date" @change="store.load()" />
+        </div>
       </section>
       <details v-for="g in store.groups" :key="g.id" :open="groupOpen(g)">
-        <summary>{{ g.name }}</summary>
+        <summary>
+          {{ g.name
+          }}<span
+            v-if="selCount(g)"
+            class="badge"
+            title="Auswahl dieser Gruppe aufheben"
+            @click.prevent.stop="store.clearTags(g.tags.map((t) => t.id))"
+            >{{ selCount(g) }} ✕</span
+          >
+        </summary>
         <div class="chips">
           <button
             v-for="t in g.tags"
             :key="t.id"
-            :class="{ on: store.selectedTags.includes(t.id) }"
+            :class="{ on: store.selectedTags.includes(t.id), zero: t.count === 0 }"
             @click="store.toggleTag(t.id)"
           >
             {{ t.name }} <small>{{ t.count }}</small>
           </button>
         </div>
       </details>
-      <button class="reset" @click="store.reset()">Filter zurücksetzen</button>
-      <button class="reset" @click="store.allYears()">Alle Jahre</button>
     </aside>
 
     <main @click.self="selected = new Set()">
@@ -177,6 +254,13 @@ function groupOpen(g) {
           <span class="sel" :class="{ on: selected.has(p.id) }" @click.stop="select(p, $event)">{{
             selected.has(p.id) ? '✓' : ''
           }}</span>
+          <a
+            class="dl"
+            :href="`/api/photos/${p.id}/original`"
+            title="Original herunterladen"
+            @click.stop
+            >⬇</a
+          >
           <img
             :src="`/api/photos/${p.id}/thumb?size=400`"
             loading="lazy"
@@ -203,9 +287,37 @@ function groupOpen(g) {
       </button>
     </main>
 
-    <div v-if="current" class="overlay" @click="current = null">
+    <div v-if="current" class="overlay" :class="{ withInfo: showInfo }" @click="current = null">
       <button class="nav prev" @click.stop="step(-1)">‹</button>
       <button class="nav next" @click.stop="step(1)">›</button>
+      <div class="tools" @click.stop>
+        <button @click="showInfo = !showInfo">ⓘ Info</button>
+        <a class="btn" :href="`/api/photos/${current.id}/original`">Original herunterladen</a>
+        <button @click="current = null">✕</button>
+      </div>
+      <aside v-if="showInfo" class="info" @click.stop>
+        <h3>Foto-Informationen</h3>
+        <dl v-if="info">
+          <dt>Datei</dt>
+          <dd>{{ info.file_name }}</dd>
+          <dt>Ordner im Archiv</dt>
+          <dd>{{ folderOf(info.rel_path) }}</dd>
+          <dt>Aufnahmedatum</dt>
+          <dd>
+            {{ fmt(info) }} <small>({{ sourceText(info) }})</small>
+          </dd>
+          <dt>Größe</dt>
+          <dd>{{ info.width }} × {{ info.height }} px, {{ mb(info.file_size) }} MB</dd>
+          <dt>Sterne</dt>
+          <dd>{{ stars(info.rating) || 'keine' }}</dd>
+          <dt>Fotograf</dt>
+          <dd>{{ info.photographer || '–' }}</dd>
+          <template v-for="(names, g) in tagsByGroup(current)" :key="g">
+            <dt>{{ g }}</dt>
+            <dd>{{ names.join(', ') }}</dd>
+          </template>
+        </dl>
+      </aside>
       <img :src="`/api/photos/${current.id}/thumb?size=1600`" :alt="current.file_name" />
       <p>
         {{ current.file_name }} · {{ fmt(current) }} · {{ stars(current.rating) }}<br />
@@ -218,7 +330,7 @@ function groupOpen(g) {
 <style scoped>
 .layout {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 300px 1fr;
   gap: 1rem;
   padding: 1rem;
   align-items: start;
@@ -422,5 +534,212 @@ figure.selected {
 .selbar button:disabled {
   opacity: 0.5;
   cursor: default;
+}
+.resets {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+.resets .reset {
+  margin-top: 0;
+}
+.chips button.zero {
+  opacity: 0.45;
+}
+.dl {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  border-radius: 4px;
+  text-decoration: none;
+  font-size: 14px;
+  opacity: 0;
+}
+figure:hover .dl {
+  opacity: 1;
+}
+@media (hover: none) {
+  .dl {
+    opacity: 1;
+  }
+}
+.tools {
+  position: fixed;
+  top: 0.8rem;
+  right: 0.8rem;
+  display: flex;
+  gap: 0.5rem;
+  z-index: 11;
+}
+.tools button,
+.tools .btn {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: none;
+  padding: 0.4rem 0.9rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+.tools button:hover,
+.tools .btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+.info {
+  position: fixed;
+  top: 3.4rem;
+  right: 0.8rem;
+  bottom: 0.8rem;
+  width: 320px;
+  background: rgba(20, 20, 20, 0.92);
+  color: #eee;
+  padding: 0.8rem 1rem;
+  border-radius: 8px;
+  overflow-y: auto;
+  cursor: default;
+  text-align: left;
+  z-index: 11;
+}
+.info h3 {
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+}
+.info dt {
+  font-size: 0.75rem;
+  color: #aaa;
+  margin-top: 0.5rem;
+}
+.info dd {
+  margin: 0;
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+.withInfo .next {
+  right: 350px;
+}
+.badge {
+  margin-left: 0.4rem;
+  background: #1f3a5f;
+  color: #fff;
+  border-radius: 10px;
+  padding: 0 0.45rem;
+  font-size: 0.75rem;
+}
+.active {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.4rem 0;
+}
+.active button {
+  border: 1px solid #1f3a5f;
+  background: #1f3a5f;
+  color: #fff;
+  border-radius: 14px;
+  padding: 0.15rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.badge {
+  cursor: pointer;
+}
+
+/* --- modernes Erscheinungsbild --- */
+.filters {
+  padding: 1rem;
+  border-radius: 14px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.06),
+    0 6px 20px rgba(0, 0, 0, 0.04);
+}
+.filters h2 {
+  font-size: 1.2rem;
+  margin: 0 0 0.4rem;
+}
+.filters h3 {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #6b7280;
+  margin: 1rem 0 0.4rem;
+}
+.chips button,
+.reset,
+.more {
+  border: 1px solid transparent;
+  background: #eef0f4;
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.82rem;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.chips button:hover,
+.reset:hover,
+.more:hover {
+  background: #e0e5ee;
+}
+.chips button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.range {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.range span {
+  color: #9ca3af;
+}
+.range input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #d9dde5;
+  border-radius: 8px;
+  padding: 0.3rem 0.4rem;
+  font: inherit;
+  font-size: 0.82rem;
+  background: #fff;
+}
+details {
+  border-top: 1px solid #eef0f4;
+  padding-top: 0.5rem;
+}
+summary {
+  font-size: 0.92rem;
+}
+figure {
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s;
+}
+figure:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+}
+
+.chips.rating {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.35rem;
+  padding: 0.45rem;
+  border: 1px solid #d9dde5;
+  border-radius: 12px;
+}
+.chips.rating button {
+  text-align: center;
+  padding: 0.3rem 0;
 }
 </style>

@@ -18,7 +18,12 @@ export const usePhotosStore = defineStore('photos', () => {
   let seq = 0
 
   async function loadTags() {
-    const r = await fetch('/api/tags')
+    const p = new URLSearchParams()
+    if (rating.value) p.set('rating', rating.value)
+    if (selectedTags.value.length) p.set('tags', selectedTags.value.join(','))
+    if (from.value) p.set('from', from.value)
+    if (to.value) p.set('to', to.value)
+    const r = await fetch('/api/tags?' + p)
     groups.value = await r.json()
   }
 
@@ -32,6 +37,7 @@ export const usePhotosStore = defineStore('photos', () => {
   }
 
   async function load(reset = true) {
+    if (reset) loadTags()
     const my = ++seq
     loading.value = true
     const offset = reset ? 0 : photos.value.length
@@ -63,6 +69,11 @@ export const usePhotosStore = defineStore('photos', () => {
     load()
   }
 
+  function clearTags(ids) {
+    selectedTags.value = selectedTags.value.filter((id) => !ids.includes(id))
+    load()
+  }
+
   function allYears() {
     from.value = ''
     to.value = ''
@@ -84,5 +95,6 @@ export const usePhotosStore = defineStore('photos', () => {
     toggleTag,
     reset,
     allYears,
+    clearTags,
   }
 })
