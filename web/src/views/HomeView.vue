@@ -1,9 +1,40 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { usePhotosStore } from '@/stores/photos'
+import EditDialog from '@/components/EditDialog.vue'
 
 const store = usePhotosStore()
 const current = ref(null)
+
+const editIds = ref(null)
+const editPhotos = computed(() => {
+  if (!editIds.value) return []
+  const set = new Set(editIds.value)
+  return store.photos.filter((p) => set.has(p.id))
+})
+function openEdit(ids) {
+  if (ids.length) editIds.value = ids
+}
+async function onSaved({ ids, rating, adds, removes }) {
+  const set = new Set(ids)
+  for (const p of store.photos) {
+    if (!set.has(p.id)) continue
+    if (rating !== undefined) p.rating = rating || null
+    p.tags = (p.tags ?? []).filter(
+      (x) => !removes.some((r) => r.group === x.group && r.name === x.name),
+    )
+    for (const a of adds) {
+      if (!p.tags.some((x) => x.group === a.group && x.name === a.name)) {
+        p.tags.push({ group: a.group, name: a.name })
+      }
+    }
+  }
+  store.loadTags()
+  if (showInfo.value && current.value) {
+    const r = await fetch(`/api/photos/${current.value.id}`)
+    info.value = await r.json()
+  }
+}
 
 onMounted(async () => {
   await store.loadTags()
@@ -20,6 +51,7 @@ function step(d) {
 }
 
 function onKey(e) {
+  if (editIds.value) return
   if (current.value) {
     if (e.key === 'ArrowRight') step(1)
     else if (e.key === 'ArrowLeft') step(-1)
@@ -63,17 +95,10 @@ function select(p, e) {
   if (e.shiftKey) {
     s = new Set(range(p))
     if (anchor === null) anchor = p.id
-  } else if (e.ctrlKey || e.metaKey) {
+  } else {
     s = new Set(selected.value)
     if (s.has(p.id)) s.delete(p.id)
     else s.add(p.id)
-    anchor = p.id
-  } else if (selected.value.has(p.id)) {
-    s = new Set(selected.value)
-    s.delete(p.id)
-    anchor = p.id
-  } else {
-    s = new Set([p.id])
     anchor = p.id
   }
   selected.value = s
@@ -247,6 +272,7 @@ function groupOpen(g) {
           <button @click="selectAllLoaded">Alle geladenen auswählen</button>
           <button :disabled="!selected.size" @click="selected = new Set()">Auswahl aufheben</button>
           <button :disabled="!selected.size" @click="downloadZip">Als ZIP herunterladen</button>
+          <button :disabled="!selected.size" @click="openEdit([...selected])">Bearbeiten …</button>
         </span>
       </p>
       <div class="grid" @click.self="selected = new Set()">
@@ -292,6 +318,7 @@ function groupOpen(g) {
       <button class="nav next" @click.stop="step(1)">›</button>
       <div class="tools" @click.stop>
         <button @click="showInfo = !showInfo">ⓘ Info</button>
+        <button @click="openEdit([current.id])">✎ Bearbeiten</button>
         <a class="btn" :href="`/api/photos/${current.id}/original`">Original herunterladen</a>
         <button @click="current = null">✕</button>
       </div>
@@ -324,6 +351,8 @@ function groupOpen(g) {
         {{ current.tags.map((t) => t.group + ': ' + t.name).join(', ') }}
       </p>
     </div>
+
+    <EditDialog v-if="editIds" :photos="editPhotos" @close="editIds = null" @saved="onSaved" />
   </div>
 </template>
 

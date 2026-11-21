@@ -1,0 +1,325 @@
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+
+const files = ref([])
+const anlass = ref('')
+const photographer = ref('')
+const date = ref('')
+const eventTag = ref(false) //scheint mir nicht so sinnvoll.
+const groups = ref([])
+const selected = ref(new Set())
+const busy = ref(false)
+const result = ref(null)
+const error = ref('')
+const drag = ref(false)
+
+async function loadTags() {
+  const r = await fetch('/api/tags')
+  groups.value = (await r.json())
+    .map((g) => ({ ...g, tags: g.tags.filter((t) => !t.legacy) }))
+    .filter((g) => g.tags.length)
+}
+onMounted(loadTags)
+
+function addFiles(list) {
+  for (const f of list) {
+    if (!files.value.some((x) => x.name === f.name && x.size === f.size)) files.value.push(f)
+  }
+}
+function onDrop(e) {
+  drag.value = false
+  addFiles(e.dataTransfer.files)
+}
+function onPick(e) {
+  addFiles(e.target.files)
+  e.target.value = ''
+}
+function remove(i) {
+  files.value.splice(i, 1)
+}
+function toggle(id) {
+  const s = new Set(selected.value)
+  if (s.has(id)) s.delete(id)
+  else s.add(id)
+  selected.value = s
+}
+const count = (g) => g.tags.filter((t) => selected.value.has(t.id)).length
+const size = computed(() => files.value.reduce((a, f) => a + f.size, 0))
+const mb = (n) => (n / 1048576).toFixed(1) + ' MB'
+const canSend = computed(() => files.value.length > 0 && anlass.value.trim() && !busy.value)
+
+async function send() {
+  busy.value = true
+  error.value = ''
+  result.value = null
+  const fd = new FormData()
+  fd.append('anlass', anlass.value)
+  fd.append('photographer', photographer.value)
+  if (date.value) fd.append('date', date.value)
+  fd.append('tags', [...selected.value].join(','))
+  fd.append('eventTag', eventTag.value ? '1' : '0')
+  for (const f of files.value) fd.append('files', f)
+  try {
+    const r = await fetch('/api/upload', { method: 'POST', body: fd })
+    const j = await r.json()
+    if (!r.ok) {
+      error.value = j.error || 'Fehler beim Hochladen'
+    } else {
+      result.value = j
+      files.value = []
+      loadTags()
+    }
+  } catch {
+    error.value = 'Verbindung fehlgeschlagen'
+  }
+  busy.value = false
+}
+</script>
+
+<template>
+  <main class="up">
+    <h1>Fotos hochladen</h1>
+
+    <div
+      class="drop"
+      :class="{ over: drag }"
+      @dragover.prevent="drag = true"
+      @dragleave="drag = false"
+      @drop.prevent="onDrop"
+    >
+      <p>JPEG-Dateien oder eine ZIP hierher ziehen</p>
+      <label class="pick">
+        Dateien wählen
+        <input type="file" multiple accept=".jpg,.jpeg,.zip" hidden @change="onPick" />
+      </label>
+    </div>
+
+    <ul v-if="files.length" class="flist">
+      <li v-for="(f, i) in files" :key="f.name + f.size">
+        <span class="fn">{{ f.name }}</span>
+        <span class="fs">{{ mb(f.size) }}</span>
+        <button type="button" title="Entfernen" @click="remove(i)">✕</button>
+      </li>
+    </ul>
+    <p v-if="files.length" class="sum">{{ files.length }} Datei(en), {{ mb(size) }}</p>
+
+    <div class="form">
+      <label
+        >Anlass (kurzer Text) *
+        <input v-model="anlass" maxlength="80" placeholder="z.B. Abschlussfeier BFS" />
+      </label>
+      <label
+        >Fotograf (optional)
+        <input v-model="photographer" />
+      </label>
+      <label
+        >Datum für alle (nur für Fotos ohne Aufnahmedatum)
+        <input v-model="date" type="date" />
+      </label>
+      <!--
+      <label class="chk">
+        <input v-model="eventTag" type="checkbox" /> Anlass auch als Event-Tag anlegen
+      </label> -->
+    </div>
+
+    <button class="go" :disabled="!canSend" @click="send">
+      {{ busy ? 'Lade hoch …' : files.length + ' Foto(s) hochladen' }}
+    </button>
+    <p v-if="error" class="err">{{ error }}</p>
+
+    <h2>Tags für alle Fotos</h2>
+    <details v-for="g in groups" :key="g.id">
+      <summary>
+        {{ g.name }}<span v-if="count(g)" class="n">{{ count(g) }}</span>
+      </summary>
+      <div class="chips">
+        <button
+          v-for="t in g.tags"
+          :key="t.id"
+          type="button"
+          :class="{ on: selected.has(t.id) }"
+          @click="toggle(t.id)"
+        >
+          {{ t.name }}
+        </button>
+      </div>
+    </details>
+
+    <button class="go" :disabled="!canSend" @click="send">
+      {{ busy ? 'Lade hoch …' : files.length + ' Foto(s) hochladen' }}
+    </button>
+    <p v-if="error" class="err">{{ error }}</p>
+
+    <section v-if="result" class="res">
+      <h2>
+        {{ result.ok }} gespeichert<span v-if="result.failed"
+          >, {{ result.failed }} fehlgeschlagen</span
+        >
+      </h2>
+      <ul>
+        <li v-for="(f, i) in result.files" :key="i" :class="{ bad: f.error }">
+          {{ f.name }} → {{ f.error ?? f.rel ?? 'bereits vorhanden: ' + f.duplicate }}
+          <small v-if="f.source === 'manual'">(Datum für alle)</small>
+        </li>
+      </ul>
+    </section>
+  </main>
+</template>
+
+<style scoped>
+.up {
+  max-width: 760px;
+  margin: 1.5rem auto;
+  padding: 0 1rem;
+}
+.drop {
+  border: 2px dashed #c5cbd6;
+  border-radius: 14px;
+  padding: 2rem;
+  text-align: center;
+  background: #fff;
+}
+.drop.over {
+  border-color: var(--accent);
+  background: #eef3fc;
+}
+.pick {
+  display: inline-block;
+  margin-top: 0.5rem;
+  background: var(--accent);
+  color: #fff;
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.flist {
+  list-style: none;
+  padding: 0;
+  margin: 0.8rem 0 0;
+  background: #fff;
+  border-radius: 12px;
+  max-height: 220px;
+  overflow: auto;
+}
+.flist li {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.3rem 0.8rem;
+  border-bottom: 1px solid #f0f1f4;
+}
+.fn {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fs,
+.sum {
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+.flist button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #9ca3af;
+}
+.form {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 1rem;
+  background: #fff;
+  padding: 1rem;
+  border-radius: 14px;
+}
+.form label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: #4b5563;
+}
+.form input:not([type='checkbox']) {
+  border: 1px solid #d9dde5;
+  border-radius: 8px;
+  padding: 0.4rem 0.5rem;
+  font: inherit;
+}
+.form .chk {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+h2 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #6b7280;
+  margin: 1.2rem 0 0.4rem;
+}
+details {
+  background: #fff;
+  border-radius: 12px;
+  padding: 0.5rem 0.8rem;
+  margin: 0.4rem 0;
+}
+summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.n {
+  margin-left: 0.5rem;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0 0.5rem;
+  font-size: 0.75rem;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.5rem 0;
+}
+.chips button {
+  border: 1px solid transparent;
+  background: #eef0f4;
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.chips button.on {
+  background: var(--accent);
+  color: #fff;
+}
+.go {
+  margin-top: 1rem;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 0.6rem 1.6rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.go:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.res {
+  margin-top: 1rem;
+  background: #fff;
+  border-radius: 14px;
+  padding: 1rem;
+}
+.res ul {
+  padding-left: 1.1rem;
+  margin: 0.4rem 0;
+  font-size: 0.85rem;
+}
+.err,
+.bad {
+  color: #b42318;
+}
+</style>

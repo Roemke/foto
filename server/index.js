@@ -4,6 +4,8 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { ZipArchive } from 'archiver';
 import { pool } from './db.js';
+import { makeUploadRouter } from './upload.js';
+import { makeEditRouter } from './edit.js';
 
 const ROOT = path.resolve(process.env.PHOTO_ROOT);
 const THUMB_DIR = path.resolve(process.env.THUMB_DIR);
@@ -52,6 +54,9 @@ async function downloadName(row) {
 }
 
 const app = express();
+
+app.use('/api/upload', makeUploadRouter(pool));
+app.use('/api/edit', makeEditRouter(pool));
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
