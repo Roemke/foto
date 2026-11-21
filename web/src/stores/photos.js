@@ -1,0 +1,78 @@
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+
+const PAGE = 60
+
+export const usePhotosStore = defineStore('photos', () => {
+  const groups = ref([])
+  const photos = ref([])
+  const total = ref(0)
+  const loading = ref(false)
+  const rating = ref(0)
+  const selectedTags = ref([])
+  const from = ref('')
+  const to = ref('')
+  let seq = 0
+
+  async function loadTags() {
+    const r = await fetch('/api/tags')
+    groups.value = await r.json()
+  }
+
+  function buildQuery(offset) {
+    const p = new URLSearchParams({ limit: PAGE, offset })
+    if (rating.value) p.set('rating', rating.value)
+    if (selectedTags.value.length) p.set('tags', selectedTags.value.join(','))
+    if (from.value) p.set('from', from.value)
+    if (to.value) p.set('to', to.value)
+    return p
+  }
+
+  async function load(reset = true) {
+    const my = ++seq
+    loading.value = true
+    const offset = reset ? 0 : photos.value.length
+    const r = await fetch('/api/photos?' + buildQuery(offset))
+    const data = await r.json()
+    if (my !== seq) return
+    photos.value = reset ? data.photos : [...photos.value, ...data.photos]
+    total.value = data.total
+    loading.value = false
+  }
+
+  function setRating(n) {
+    rating.value = n
+    load()
+  }
+
+  function toggleTag(id) {
+    const i = selectedTags.value.indexOf(id)
+    if (i >= 0) selectedTags.value.splice(i, 1)
+    else selectedTags.value.push(id)
+    load()
+  }
+
+  function reset() {
+    rating.value = 0
+    selectedTags.value = []
+    from.value = ''
+    to.value = ''
+    load()
+  }
+
+  return {
+    groups,
+    photos,
+    total,
+    loading,
+    rating,
+    selectedTags,
+    from,
+    to,
+    loadTags,
+    load,
+    setRating,
+    toggleTag,
+    reset,
+  }
+})
