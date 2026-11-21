@@ -2,7 +2,7 @@
   <main class="legal">
     <RouterLink to="/">← Zurück</RouterLink>
     <h1>Impressum</h1>
-    <p class="stand">Glasfachschule NRW · Stand: 29. Oktober 2026</p>
+    <p class="stand">Glasfachschule NRW · Stand: November 2026</p>
     <h2>Anbieter</h2>
     <p>
       Glasfachschule NRW<br />
