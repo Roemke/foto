@@ -49,6 +49,53 @@ async function dropThumbs(ids) {
       await fs.rm(path.join(THUMB_DIR, String(s), `${id}.jpg`), { force: true })
 }
 
+async function findDuplicates(pool, added, disk) {
+  const dups = []
+  const bySize = new Map()
+  for (const rel of added) {
+    const size = disk.get(rel).size
+    if (!bySize.has(size)) bySize.set(size, [])
+    bySize.get(size).push(rel)
+  }
+  const sizes = [...bySize.keys()]
+  const existing = new Map()
+  for (let i = 0; i < sizes.length; i += 1000) {
+    const [rows] = await pool.query(
+      'SELECT file_size, rel_path FROM photos WHERE file_size IN (?)',
+      [sizes.slice(i, i + 1000)],
+    )
+    for (const r of rows) {
+      const size = Number(r.file_size)
+      if (!existing.has(size)) existing.set(size, [])
+      existing.get(size).push(r.rel_path)
+    }
+  }
+  for (const [size, rels] of bySize) {
+    const known = existing.get(size) ?? []
+    if (!known.length && rels.length < 2) continue
+    const cands = [...known, ...rels]
+    const cache = new Map()
+    const read = async (r) => {
+      if (!cache.has(r)) cache.set(r, await fs.readFile(path.join(ROOT, r)))
+      return cache.get(r)
+    }
+    try {
+      for (let j = known.length; j < cands.length; j++) {
+        const a = await read(cands[j])
+        for (let i = 0; i < j; i++) {
+          if (a.equals(await read(cands[i]))) {
+            dups.push({ rel: cands[j], sameAs: cands[i] })
+            break
+          }
+        }
+      }
+    } catch (e) {
+      console.error('sync: Dublettenprüfung übersprungen', size, e.message)
+    }
+  }
+  return dups
+}
+
 export async function syncArchive(pool, { dryRun = false, force = false } = {}) {
   if (running) throw new Error('Abgleich läuft bereits')
   running = true
@@ -81,6 +128,9 @@ export async function syncArchive(pool, { dryRun = false, force = false } = {}) 
       errors: [],
       notes: [],
     }
+    const dups = await findDuplicates(pool, added, disk)
+    res.duplicates = dups.length
+    res.duplicateList = dups.slice(0, 200)
     let removeOk = state.complete
     if (!state.complete) res.notes.push('Ordner nicht lesbar: nichts wird entfernt')
     if (disk.size === 0 && rows.length > 0) {
