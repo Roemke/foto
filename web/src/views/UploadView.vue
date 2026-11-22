@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 
 const files = ref([])
 const anlass = ref('')
@@ -21,7 +21,34 @@ async function loadTags() {
     .map((g) => ({ ...g, tags: g.tags.filter((t) => !t.legacy) }))
     .filter((g) => g.tags.length)
 }
-onMounted(loadTags)
+const hasFiles = (e) => e.dataTransfer?.types?.includes('Files')
+function winOver(e) {
+  if (!hasFiles(e)) return
+  e.preventDefault()
+  drag.value = true
+}
+function winLeave(e) {
+  if (!e.relatedTarget) drag.value = false
+}
+function winDrop(e) {
+  if (!hasFiles(e)) return
+  e.preventDefault()
+  drag.value = false
+  addFiles(e.dataTransfer.files)
+}
+onMounted(() => {
+  loadTags()
+  window.addEventListener('dragenter', winOver)
+  window.addEventListener('dragover', winOver)
+  window.addEventListener('dragleave', winLeave)
+  window.addEventListener('drop', winDrop)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('dragenter', winOver)
+  window.removeEventListener('dragover', winOver)
+  window.removeEventListener('dragleave', winLeave)
+  window.removeEventListener('drop', winDrop)
+})
 
 function addFiles(list) {
   for (const f of list) {
@@ -123,10 +150,9 @@ async function send() {
       class="drop"
       :class="{ over: drag }"
       @dragover.prevent="drag = true"
-      @dragleave="drag = false"
-      @drop.prevent="onDrop"
+      @drop.prevent.stop="onDrop"
     >
-      <p>JPEG-Dateien oder eine ZIP hierher ziehen</p>
+      <p>{{ drag ? 'Zum Hinzufügen loslassen' : 'JPEG-Dateien oder eine ZIP hierher ziehen' }}</p>
       <label class="pick">
         Dateien wählen
         <input type="file" multiple accept=".jpg,.jpeg,.zip" hidden @change="onPick" />
@@ -248,7 +274,9 @@ async function send() {
 }
 .drop.over {
   border-color: var(--accent);
-  background: #eef3fc;
+  border-style: solid;
+  background: #dbe7fb;
+  font-weight: 600;
 }
 .pick {
   display: inline-block;
