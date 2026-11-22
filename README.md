@@ -1,128 +1,251 @@
 # Schulfotos
 
-Webanwendung zum Sammeln, Verschlagworten, Bewerten und Wiederfinden von Schulfotos.
-Sie ersetzt die bisherige Arbeit mit Adobe Bridge auf einem Netzlaufwerk (Nextcloud).
-
-## Idee
-
-Die Fotos bleiben als normale JPEG-Dateien in einem Ordnerbaum liegen. Alle Metadaten
-(Sterne, Schlagwörter, Fotograf, Datum) stehen **in den Dateien selbst** (XMP/EXIF).
-Die Datenbank ist nur ein schneller Index darüber. Dadurch bleiben die Fotos auch ohne
-die App nutzbar, etwa mit Adobe Bridge, und der Index lässt sich jederzeit neu aufbauen.
+Webanwendung zur Verwaltung des Foto-Archivs einer Schule. Sie ersetzt die bisherige Kombination aus Adobe Bridge und einem Netzlaufwerk (Nextcloud): Fotos lassen sich im Browser ansehen, filtern, herunterladen und hochladen. Bewertung und Verschlagwortung stehen direkt in den JPEG-Dateien (XMP), die Datenbank ist nur ein Index.
 
 ## Funktionen
 
-- Fotoübersicht mit Filtern: Zeitraum, Sterne, Tags (nach Gruppen, mit Trefferzahlen)
-- Großansicht mit Blättern, Info-Panel, Download des Originals, ZIP-Download mehrerer Fotos
-- Upload einzelner JPEGs oder ZIP-Dateien, mit Dublettenerkennung und Einsortierung in
-  `Jahr/MM-Monat`, Dateiname `JJJJ-MM-TT-HHhMMmSSs-Anlass.jpg`
-- Bearbeiten (einzeln oder viele): Sterne, Tags, Aufnahmedatum, Fotograf; wird sofort in
-  die Datei zurückgeschrieben
-- Tag-Verwaltung: Gruppen und Tags anlegen, umbenennen, zusammenführen, löschen
-- Papierkorb mit Wiederherstellen und endgültigem Löschen
-- Anmeldung über Microsoft 365 (OpenID Connect) mit einfacher Rechteverwaltung
-- Archiv-Abgleich: neue, geänderte und gelöschte Dateien auf der Platte werden in die
-  Datenbank übernommen (manuell und nachts per Zeitplan)
+- Anmeldung mit Microsoft 365 (Entra ID, OpenID Connect), nur Konten einer festgelegten Domain
+- Rollen: **Nutzer** (ansehen, herunterladen, hochladen) und **Admin** (zusätzlich Metadaten bearbeiten, löschen, Tags und Nutzer verwalten)
+- Foto-Raster mit Filtern (u. a. nach Zeitraum und Tags) und Großansicht
+- Upload von Fotos
+- Papierkorb mit Wiederherstellung
+- Tag-Verwaltung
+- Nutzerverwaltung (Admin)
+- Archiv-Abgleich zwischen Dateisystem und Datenbank, nächtlich und manuell auslösbar
+- Dublettenerkennung mit Verwaltungsseite zum Aufräumen
+- Seiten für Impressum und Datenschutz
 
 ## Technik
 
-- Server: Node.js, Express 5, MariaDB, `sharp` (Vorschaubilder), `exiftool` (Metadaten)
-- Weboberfläche: Vue 3 (Vite, Pinia, Vue Router)
-- Anmeldung: `openid-client` (OIDC mit PKCE), Sitzungen über `express-session`
+- Server: Node.js, Express 5, `openid-client`, `express-session`, `sharp` (Thumbnails), `exiftool` (Metadaten)
+- Oberfläche: Vue 3 mit Vite, Pinia und Vue Router
+- Datenbank: MariaDB
 
-## Rahmenbedingungen und Grenzen
+## Prinzipien
 
-- Unterstützt wird **nur JPEG**. Andere Formate (HEIC, RAW, Video) werden nicht verarbeitet.
-- Die Datei hat Vorrang: Ändert jemand eine Datei außerhalb der App (zum Beispiel mit Bridge),
-  übernimmt der Abgleich deren Metadaten in die Datenbank.
-- Der Abgleich entfernt keine Daten, wenn auf einmal sehr viele Dateien fehlen (zum Beispiel
-  bei nicht eingebundener Freigabe). Dann bricht er ab und meldet es.
-- Zugang haben nur Konten der konfigurierten Domäne (`ALLOWED_DOMAIN`). Alle dürfen ansehen,
-  herunterladen und hochladen. Bearbeiten, Löschen, Tag-Verwaltung, Papierkorb und
-  Nutzerverwaltung sind der Verwaltungsgruppe vorbehalten.
-- Die App ist für den Betrieb hinter einem Reverse Proxy mit HTTPS gedacht und sollte nicht
-  ohne Anmeldung erreichbar sein.
-- Datenschutz: Fotos mit erkennbaren Personen unterliegen den Regeln der Schule (Einwilligungen).
-  Die Fotos, die `.env` und Zugangsdaten gehören **nicht** ins Repository.
+- Die Datei ist maßgeblich. Rating, Schlagwörter (auch hierarchisch) und Fotograf stehen im XMP der JPEG-Datei. Bei Abweichungen zwischen Datei und Datenbank gilt die Datei.
+- Fotos gehören nicht ins Repository, ebenso wenig die Datei `.env`.
 
-## Voraussetzungen
+## Grenzen
 
-- Linux, Node.js 20.6 oder neuer (wegen `node --env-file`)
-- MariaDB
-- `exiftool` (Debian/Ubuntu: Paket `libimage-exiftool-perl`)
-- Ein Microsoft-Entra-Mandant (oder ein anderer OIDC-Anbieter, zum Beispiel Keycloak)
+- Nur JPEG. Andere Formate (z. B. HEIC) werden noch nicht unterstützt.
+- Sitzungen liegen im Arbeitsspeicher. Nach einem Neustart des Servers müssen sich alle Nutzer neu anmelden.
+- Zugriff hat jedes Konto der erlaubten Domain. Eine Prüfung der Gruppenmitgliedschaft gibt es nicht.
+- Dubletten sind byte-identische Dateien. Ein verkleinertes oder neu gespeichertes Foto gilt als anderes Foto.
+- Impressum und Datenschutzerklärung sind Entwurfstexte und müssen vor dem Produktivbetrieb geprüft werden.
 
-## Installation (Entwicklung)
+## Installation
 
-```bash
-git clone https://github.com/Roemke/foto.git
-cd foto
+Die Anleitung beschreibt den Betrieb hinter einem Reverse Proxy auf einem Ubuntu-Server mit Apache. Beispielwerte: Adresse `fotos.bk-rheinbach.net`, Installation unter `/opt/fotos`, Dienstbenutzer `www-data`, Archiv in einem Nextcloud-Gruppenordner. Alle Befehle werden mit `sudo` ausgeführt.
 
-# Datenbank anlegen
-sudo mysql -e "CREATE DATABASE schulfotos CHARACTER SET utf8mb4"
-sudo mysql -e "CREATE USER 'schulfotos'@'localhost' IDENTIFIED BY 'PASSWORT'"
-sudo mysql -e "GRANT ALL ON schulfotos.* TO 'schulfotos'@'localhost'"
-mysql -u schulfotos -p schulfotos < server/db/schema.sql
-
-# Server
-cd server && npm install
-# .env anlegen (siehe unten), dann:
-node --watch --env-file=.env index.js
-
-# Weboberfläche (zweites Terminal)
-cd web && npm install && npm run dev
+```
+Browser --HTTPS--> Proxy (hier schulix), TLS endet dort
+Proxy   --HTTP---> Apache auf dem Server
+Apache  --HTTP---> Node-Dienst (127.0.0.1:3000)
 ```
 
-Die Weboberfläche läuft dann auf Port 5173 und leitet `/api` an den Server (Port 3000) weiter.
+Der Node-Dienst liefert Oberfläche und API selbst aus, ein zusätzlicher
+Webserver für die Dateien ist nicht nötig. Der Apache leitet nur weiter.
+
+**Vor dem Start:** Sicherung des Archivs anlegen. Die Anwendung schreibt Metadaten in die JPEG-Dateien und verschiebt gelöschte Fotos in den Papierkorb.
+
+### 1. Voraussetzungen
+
+- Git
+- Node.js `^20.19` oder `>=22.12` (Vorgabe von Vite für den Build; der Server nutzt außerdem `--env-file`)
+- MariaDB
+- exiftool (Ubuntu: `sudo apt install libimage-exiftool-perl`)
+- Apache mit den Modulen `proxy`, `proxy_http` und `headers`:
+
+```bash
+sudo a2enmod proxy proxy_http headers
+```
+
+### 2. Code holen und bauen
+
+```bash
+sudo git clone https://github.com/Roemke/foto.git /opt/fotos
+cd /opt/fotos/server && sudo npm install --omit=dev
+cd /opt/fotos/web && sudo npm install && sudo npm run build
+```
+
+Das Ergebnis des Frontend-Builds liegt in `/opt/fotos/web/dist`. Der Node-Dienst liefert diesen Ordner selbst aus (Standard `../web/dist`, änderbar mit `WEB_DIST`).
+
+### 3. Datenbank
+
+`PASSWORT` durch ein eigenes ersetzen.
+
+```bash
+sudo mysql -e "CREATE DATABASE schulfotos CHARACTER SET utf8mb4; CREATE USER 'schulfotos'@'localhost' IDENTIFIED BY 'PASSWORT'; GRANT ALL ON schulfotos.* TO 'schulfotos'@'localhost';"
+sudo mysql schulfotos < /opt/fotos/server/db/schema.sql
+```
+
+### 4. Verzeichnisse und Konfiguration
+
+Die App-Registrierung in Entra (Abschnitt „Anmeldung mit Microsoft Entra“) muss vorher vorhanden sein, mit der Redirect-URI `https://fotos.bk-rheinbach.net/api/auth/callback`.
+
+Cache und Papierkorb liegen außerhalb des Archivs und müssen für den Dienstbenutzer beschreibbar sein:
+
+```bash
+sudo mkdir -p /var/cache/schulfotos /var/lib/schulfotos/papierkorb
+sudo chown -R www-data:www-data /var/cache/schulfotos /var/lib/schulfotos
+```
+
+Konfiguration anlegen. Die Platzhalter in Großbuchstaben ersetzen, `SESSION_SECRET` mit `openssl rand -hex 32` erzeugen. Die Bedeutung aller Variablen steht im Abschnitt „Konfiguration“.
+
+```bash
+sudo tee /opt/fotos/server/.env > /dev/null <<'EOF'
+DB_HOST=127.0.0.1
+DB_USER=schulfotos
+DB_PASS=PASSWORT
+DB_NAME=schulfotos
+PHOTO_ROOT=/home/lehrer/gfsCloudData/__groupfolders/1/Bilder
+THUMB_DIR=/var/cache/schulfotos
+TRASH_DIR=/var/lib/schulfotos/papierkorb
+OIDC_ISSUER=https://login.microsoftonline.com/MANDANTEN-ID/v2.0
+OIDC_CLIENT_ID=ANWENDUNGS-ID
+OIDC_CLIENT_SECRET=CLIENTGEHEIMNIS
+OIDC_REDIRECT_URI=https://fotos.bk-rheinbach.net/api/auth/callback
+ALLOWED_DOMAIN=bkrheinbach.de
+INITIAL_ADMINS=ADMIN@bkrheinbach.de
+SESSION_SECRET=ZUFALLSWERT
+NEXTCLOUD_SCAN_CMD=php /var/www/html/gfscloud/occ groupfolders:scan 1
+EOF
+sudo chown root:www-data /opt/fotos/server/.env && sudo chmod 640 /opt/fotos/server/.env
+```
+
+Prüfen, ob der Dienstbenutzer im Archiv schreiben darf:
+
+```bash
+sudo -u www-data test -w /home/lehrer/gfsCloudData/__groupfolders/1/Bilder && echo schreibbar
+```
+
+### 5. Dienst einrichten (systemd)
+
+Den Pfad zu Node vorher mit `which node` prüfen.
+
+```bash
+sudo tee /etc/systemd/system/schulfotos.service > /dev/null <<'EOF'
+[Unit]
+Description=Schulfotos (Node/Express)
+After=network.target mariadb.service
+
+[Service]
+User=www-data
+WorkingDirectory=/opt/fotos/server
+ExecStart=/usr/bin/node --env-file=.env index.js
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload && sudo systemctl enable --now schulfotos
+curl -si http://127.0.0.1:3000/api/health | head -1
+```
+
+Erwartet: `HTTP/1.1 200 OK`. Das Log steht unter `journalctl -u schulfotos -f`.
+
+### 6. Apache einrichten
+
+Der Apache leitet alles an den Node-Dienst weiter, der Oberfläche und API
+ausliefert. Da TLS auf dem vorgeschalteten Proxy endet, setzt der Apache
+`X-Forwarded-Proto` fest auf `https`. Der Server leitet Protokoll und Host
+aus diesen Headern ab (`trust proxy`).
+
+```bash
+sudo tee /etc/apache2/sites-available/fotos.conf > /dev/null <<'EOF'
+<VirtualHost *:80>
+    ServerName fotos.bk-rheinbach.net
+    ProxyPreserveHost On
+    ProxyPass / http://127.0.0.1:3000/
+    ProxyPassReverse / http://127.0.0.1:3000/
+    RequestHeader set X-Forwarded-Proto "https"
+</VirtualHost>
+EOF
+sudo a2ensite fotos && sudo apache2ctl configtest && sudo systemctl reload apache2
+curl -si -H 'Host: fotos.bk-rheinbach.net' http://127.0.0.1/api/health | head -1
+curl -s -H 'Host: fotos.bk-rheinbach.net' http://127.0.0.1/ | head -3
+```
+
+Erwartet: `HTTP/1.1 200 OK` und der Anfang der HTML-Seite.
+
+Der vorgeschaltete Proxy (hier schulix) muss `fotos.bk-rheinbach.net` per HTTP
+an den Apache dieses Servers weiterleiten und den Host-Header unverändert
+lassen. Das Zertifikat und der DNS-Eintrag gehören ebenfalls dorthin. Im
+lokalen Netz muss der Name intern auf denselben Proxy zeigen, nicht direkt auf
+den Server, damit auch dort HTTPS genutzt wird. Danach lässt sich die
+Anmeldung im Browser unter `https://fotos.bk-rheinbach.net` testen.
+
+### 7. Archiv einlesen (Abgleich)
+
+Die Vorlagen für den Abgleich liegen in `deploy/`. Zuerst ein Trockenlauf, der auch die Schreibrechte und die Konfiguration prüft. Er kann bei großen Archiven dauern, daher mit niedriger Priorität:
+
+```bash
+sudo cp /opt/fotos/deploy/schulfotos-sync.service /opt/fotos/deploy/schulfotos-sync.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+cd /opt/fotos/server && sudo -u www-data nice -n 19 ionice -c3 node --env-file=.env sync-cli.js --dry
+```
+
+Erwartet: JSON-Ausgabe, `added` entspricht der Zahl der JPEG-Dateien im Archiv. Danach der erste echte Lauf im Hintergrund und der nächtliche Timer:
+
+```bash
+sudo systemctl start --no-block schulfotos-sync.service
+journalctl -u schulfotos-sync.service -f
+sudo systemctl enable --now schulfotos-sync.timer
+```
+
+### 8. Erste Anmeldung
+
+Im Browser `https://fotos.bk-rheinbach.net` öffnen und mit einem Konto aus `INITIAL_ADMINS` anmelden. Weitere Admins pflegt die App unter „Nutzer“.
 
 ## Konfiguration (`server/.env`)
 
-Die `.env` wird nicht versioniert. Sie enthält Geheimnisse.
-
 | Variable | Bedeutung |
 | --- | --- |
-| `DB_*` | Zugang zur Datenbank (Namen siehe `server/db.js`) |
-| `PHOTO_ROOT` | Wurzelordner der Fotos |
-| `THUMB_DIR` | Cache für Vorschaubilder (darf jederzeit gelöscht werden) |
-| `TRASH_DIR` | Papierkorb (Dateien behalten ihren relativen Pfad) |
-| `UPLOAD_TMP` | optional, Zwischenablage für Uploads |
-| `MAX_UPLOAD`, `MAX_ZIP` | optional, Höchstzahl Dateien pro Upload bzw. ZIP-Download (Standard 500) |
-| `OIDC_ISSUER` | Entra: `https://login.microsoftonline.com/<Mandanten-ID>/v2.0` |
-| `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | aus der App-Registrierung |
-| `OIDC_REDIRECT_URI` | Entwicklung: `http://localhost:5173/api/auth/callback` |
-| `ALLOWED_DOMAIN` | erlaubte Mail-Domäne, zum Beispiel `bkrheinbach.de` |
-| `INITIAL_ADMINS` | kommagetrennte Mailadressen der ersten Verwalter |
-| `SESSION_SECRET` | langer Zufallswert (`openssl rand -hex 32`) |
-| `NEXTCLOUD_SCAN_CMD` | optional, wird nach dem Abgleich ausgeführt (Nextcloud-Scan) |
+| `PHOTO_ROOT` | Wurzelverzeichnis des Foto-Archivs |
+| `TRASH_DIR` | Verzeichnis für den Papierkorb (außerhalb des Archivs) |
+| `OIDC_ISSUER` | z. B. `https://login.microsoftonline.com/<Mandanten-ID>/v2.0` |
+| `OIDC_CLIENT_ID` | Anwendungs-ID aus der App-Registrierung |
+| `OIDC_CLIENT_SECRET` | Clientgeheimnis, nur in `.env`, nie im Repository |
+| `OIDC_REDIRECT_URI` | z. B. `https://HOST/api/auth/callback` |
+| `ALLOWED_DOMAIN` | erlaubte Mail-Domain, z. B. `bkrheinbach.de` |
+| `INITIAL_ADMINS` | Mail-Adressen der ersten Admins, danach Pflege in der App |
+| `SESSION_SECRET` | langer Zufallswert, z. B. `openssl rand -hex 32` |
+| `NEXTCLOUD_SCAN_CMD` | optional, Befehl für einen Nextcloud-Scan nach dem Abgleich |
+| `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS` | Zugang zur MariaDB-Datenbank |
+| `THUMB_DIR` | Verzeichnis für den Thumbnail-Cache, muss für den Dienst beschreibbar sein |
+| `UPLOAD_TMP` | optional, Zwischenverzeichnis für Uploads (Standard: temporäres Verzeichnis des Systems) |
+| `MAX_UPLOAD` | optional, höchstens so viele Dateien pro Upload (Standard 500) |
+| `MAX_ZIP` | optional, höchstens so viele Fotos pro ZIP-Download (Standard 500) |
+| `WEB_DIST` | optional, Ordner der gebauten Oberfläche (Standard `../web/dist`, relativ zum Server-Verzeichnis) |
 
-### Anmeldung einrichten (Microsoft Entra)
+## Anmeldung mit Microsoft Entra
 
-1. Entra-Admincenter, App-Registrierungen, neue Registrierung, nur dieser Mandant.
-2. Umleitungs-URI (Plattform Web) eintragen, für den Betrieb zusätzlich die echte Adresse
-   `https://<Adresse>/api/auth/callback`.
-3. Client-Secret anlegen (höchstens 24 Monate Laufzeit, rechtzeitig erneuern).
-4. Tokenkonfiguration: optionalen Anspruch `email` (ID-Token) hinzufügen.
+1. In Entra eine App-Registrierung anlegen, Plattform „Web“, Redirect-URI wie `OIDC_REDIRECT_URI` (Entwicklung: `http://localhost:5173/api/auth/callback`).
+2. Ein Clientgeheimnis erzeugen. Die Laufzeit ist auf höchstens 24 Monate begrenzt, danach muss es erneuert werden.
+3. Unter „Token-Konfiguration“ den optionalen Anspruch `email` für das ID-Token hinzufügen und die Graph-Berechtigung „email“ bestätigen.
 
-Ein späterer Wechsel zu einem anderen OIDC-Anbieter (zum Beispiel Keycloak) erfolgt über die
-vier `OIDC_*`-Variablen. Die Nutzer werden über ihre Mailadresse erkannt, sie muss dort gleich sein.
+Als Identität dient die Mail-Adresse in Kleinschreibung. Ein Wechsel zu einem anderen OIDC-Anbieter (z. B. Keycloak) erfordert nur geänderte `OIDC_*`-Werte, die Mail-Adressen müssen übereinstimmen.
 
 ## Archiv-Abgleich
 
+Der Abgleich vergleicht das Archiv mit der Datenbank: neue Dateien werden aufgenommen, geänderte neu eingelesen, fehlende entfernt. Dabei werden auch neue Dubletten erfasst. Sicherungen verhindern, dass bei einem nicht eingebundenen Archiv die Datenbank geleert wird.
+
 ```bash
 cd server
-node --env-file=.env sync-cli.js --dry   # nur prüfen
-node --env-file=.env sync-cli.js         # abgleichen
+node --env-file=.env sync-cli.js --dry    # nur prüfen
+node --env-file=.env sync-cli.js          # abgleichen
+node --env-file=.env sync-cli.js --force  # auch bei vielen fehlenden Dateien entfernen
 ```
 
-Manuell geht es auch in der App auf der Seite "Nutzer". Vorlagen für einen nächtlichen
-Lauf mit systemd stehen in `deploy/`.
+Ein systemd-Timer für den nächtlichen Lauf liegt in `deploy/`. In der App lässt sich der Abgleich unter „Nutzer“ manuell starten.
 
-## Betrieb
+Wurden Dateien außerhalb von Nextcloud verändert, muss Nextcloud sie neu einlesen. Dafür dient `NEXTCLOUD_SCAN_CMD`, bei Gruppenordnern z. B. `occ groupfolders:scan`.
 
-Für den Produktivbetrieb ist ein Reverse Proxy mit HTTPS vorgesehen, der `/api` an den
-Server (127.0.0.1:3000) weiterreicht und die gebaute Weboberfläche (`npm run build` in `web/`)
-ausliefert. Die Vorlagen dafür sind noch nicht vorhanden.
+## Autor
+
+Karsten Römke. Das Projekt ist mit sehr starker Unterstützung von Claude (Anthropic) entstanden: Konzept, Code und Dokumentation wurden im Dialog mit Claude entwickelt.
 
 ## Lizenz
 
-[MIT](LICENSE)
+MIT, siehe [LICENSE](LICENSE).
