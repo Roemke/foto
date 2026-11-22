@@ -15,6 +15,7 @@ const ROOT = process.env.PHOTO_ROOT;
 const TMP = path.resolve(process.env.UPLOAD_TMP || path.join(os.tmpdir(), 'schulfotos-upload'));
 const MAX_FILES = Number(process.env.MAX_UPLOAD || 500);
 const MAX_BYTES = 500 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 1024 * 1024 * 1024; // hochgeladene Datei, auch ZIP
 
 // Nextcloud nach dem Upload nur für die betroffenen Ordner einlesen (im Hintergrund).
 // NEXTCLOUD_SCAN_PATH_CMD: Befehl, an den der Pfad als letztes Argument angehängt wird.
@@ -46,7 +47,7 @@ const INSERT_SQL = `INSERT INTO photos
   (rel_path, file_name, width, height, file_size, file_mtime, taken_at, date_source, date_precision, rating, photographer, orig_hash)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-const upload = multer({ dest: TMP, limits: { files: MAX_FILES, fileSize: MAX_BYTES } });
+const upload = multer({ dest: TMP, limits: { files: MAX_FILES, fileSize: MAX_UPLOAD_BYTES } });
 const list = (v) => (v == null ? [] : Array.isArray(v) ? v : [v]);
 
 async function findDuplicate(pool, buf, hash) {
