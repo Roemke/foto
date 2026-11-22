@@ -245,11 +245,56 @@ Im Browser `https://fotos.bk-rheinbach.net` öffnen und mit einem Konto aus `INI
 
 ## Anmeldung mit Microsoft Entra
 
-1. In Entra eine App-Registrierung anlegen, Plattform „Web“, Redirect-URI wie `OIDC_REDIRECT_URI` (Entwicklung: `http://localhost:5173/api/auth/callback`).
-2. Ein Clientgeheimnis erzeugen. Die Laufzeit ist auf höchstens 24 Monate begrenzt, danach muss es erneuert werden.
-3. Unter „Token-Konfiguration“ den optionalen Anspruch `email` für das ID-Token hinzufügen und die Graph-Berechtigung „email“ bestätigen.
+Die Anwendung meldet Nutzer über OpenID Connect an. Dafür braucht es eine
+App-Registrierung im Microsoft Entra Admin Center (mindestens die Rolle
+„Cloud-Anwendungsadministrator“).
 
-Als Identität dient die Mail-Adresse in Kleinschreibung. Ein Wechsel zu einem anderen OIDC-Anbieter (z. B. Keycloak) erfordert nur geänderte `OIDC_*`-Werte, die Mail-Adressen müssen übereinstimmen.
+### Registrierung anlegen
+
+1. Im Entra Admin Center unter *Identity > Applications > App registrations*
+   „New registration“ wählen.
+2. Einen Namen vergeben, z. B. „Schulfotos“. Bei „Supported account types“
+   „Accounts in this organizational directory only“ wählen (nur das eigene
+   Verzeichnis). Als Plattform „Web“ mit der Redirect-URI
+   `https://fotos.bk-rheinbach.net/api/auth/callback` eintragen und
+   „Register“ drücken.
+3. Auf der Übersichtsseite zwei Werte notieren:
+   - „Application (client) ID“ ergibt `OIDC_CLIENT_ID`
+   - „Directory (tenant) ID“ gehört in `OIDC_ISSUER`
+4. Weitere Redirect-URIs (z. B. für die Entwicklung
+   `http://localhost:5173/api/auth/callback`) unter *Manage > Authentication*
+   über „Add a platform“ oder bei der Plattform „Web“ ergänzen. Es können
+   mehrere URIs eingetragen sein.
+5. Unter *Certificates & secrets > Client secrets > New client secret* ein
+   Clientgeheimnis anlegen: Beschreibung eintragen, Laufzeit wählen (höchstens
+   24 Monate). Der **Wert** des Geheimnisses wird nur direkt nach dem Anlegen
+   angezeigt und ergibt `OIDC_CLIENT_SECRET`. Die „Secret ID“ ist nicht gemeint.
+   Das Ablaufdatum notieren und das Geheimnis rechtzeitig erneuern.
+6. Unter *Manage > Token configuration > Add optional claim* den Token-Typ
+   „ID“ wählen und den Anspruch `email` hinzufügen. Im Dialog die Frage nach der
+   Microsoft-Graph-Berechtigung „email“ mit dem Häkchen bestätigen.
+
+### Bereits vorhandene Registrierung
+
+Wurde die Registrierung schon für die Entwicklung angelegt, genügt es, die
+Redirect-URI der Produktion zu ergänzen (Schritt 4). Client-ID und Geheimnis
+lassen sich weiterverwenden, oder der Server bekommt ein eigenes Geheimnis.
+
+### Werte in `server/.env`
+
+```
+OIDC_ISSUER=https://login.microsoftonline.com/VERZEICHNIS-ID/v2.0
+OIDC_CLIENT_ID=ANWENDUNGS-ID
+OIDC_CLIENT_SECRET=WERT-DES-GEHEIMNISSES
+OIDC_REDIRECT_URI=https://fotos.bk-rheinbach.net/api/auth/callback
+```
+
+`OIDC_REDIRECT_URI` muss **exakt** mit einer der in Entra eingetragenen
+Redirect-URIs übereinstimmen.
+
+Als Identität dient die Mail-Adresse in Kleinschreibung. Ein Wechsel zu einem
+anderen OIDC-Anbieter (z. B. Keycloak) erfordert nur geänderte
+`OIDC_*`-Werte, die Mail-Adressen müssen übereinstimmen.
 
 ## Archiv-Abgleich
 
