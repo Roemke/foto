@@ -17,13 +17,14 @@ export const usePhotosStore = defineStore('photos', () => {
   const to = ref(DEFAULT_TO)
   const q = ref('')
   let saved = null // Zeitraum vor der Suche
+  let fresh = false // neue Suche: erst alle Jahre, dann Zeitraum der Treffer übernehmen
   let seq = 0
 
-  // Mit Suchbegriff gilt die Suche für alle Jahre, ohne Begriff der eingestellte Zeitraum.
+  // Neue Suche: alle Jahre. Danach gilt der (änderbare) Zeitraum zusammen mit dem Suchbegriff.
   function addRange(p) {
     if (q.value.trim()) {
       p.set('q', q.value.trim())
-      return
+      if (fresh) return
     }
     if (from.value) p.set('from', from.value)
     if (to.value) p.set('to', to.value)
@@ -54,11 +55,11 @@ export const usePhotosStore = defineStore('photos', () => {
     const r = await fetch('/api/photos?' + buildQuery(offset))
     const data = await r.json()
     if (my !== seq) return
-    if (reset && q.value.trim()) {
+    if (reset && fresh) {
+      fresh = false
       const lo = r.headers.get('X-Date-Min')
       const hi = r.headers.get('X-Date-Max')
       if (lo && hi) {
-        if (!saved) saved = { from: from.value, to: to.value }
         from.value = lo
         to.value = hi
       }
@@ -82,7 +83,9 @@ export const usePhotosStore = defineStore('photos', () => {
 
   function setQuery(v) {
     q.value = v
-    if (!v.trim() && saved) {
+    fresh = !!v.trim()
+    if (fresh && !saved) saved = { from: from.value, to: to.value }
+    if (!fresh && saved) {
       from.value = saved.from
       to.value = saved.to
       saved = null
@@ -97,6 +100,7 @@ export const usePhotosStore = defineStore('photos', () => {
     to.value = DEFAULT_TO
     q.value = ''
     saved = null
+    fresh = false
     load()
   }
 

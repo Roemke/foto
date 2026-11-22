@@ -273,7 +273,7 @@ function groupOpen(g) {
           placeholder="Suchen: Tag, Datum, Ordner …"
           @input="onSearch"
         />
-        <small v-if="store.q.trim()">Suche über alle Jahre</small>
+        <small v-if="store.q.trim()">Zeitraum der Treffer, änderbar</small>
       </div>
       <div class="resets">
         <button class="reset" @click="store.reset()">Filter zurücksetzen</button>
