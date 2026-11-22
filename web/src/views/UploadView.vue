@@ -62,7 +62,10 @@ function post(fd) {
     const x = new XMLHttpRequest()
     x.open('POST', '/api/upload')
     x.upload.onprogress = (e) => {
-      if (e.lengthComputable) progress.value = Math.round((e.loaded / e.total) * 100)
+      if (e.lengthComputable) {
+        progress.value = Math.round((e.loaded / e.total) * 100)
+        if (e.loaded >= e.total) phase.value = 'verarbeite'
+      }
     }
     x.upload.onload = () => {
       progress.value = 100
