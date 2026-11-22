@@ -20,6 +20,7 @@ onMounted(() => auth.load())
             <RouterLink to="/upload">Hochladen</RouterLink>
             <RouterLink v-if="auth.isAdmin" to="/admin/tags">Tags verwalten</RouterLink>
             <RouterLink v-if="auth.isAdmin" to="/trash">Papierkorb</RouterLink>
+            <RouterLink v-if="auth.isAdmin" to="/admin/duplicates">Dubletten</RouterLink>
             <RouterLink v-if="auth.isAdmin" to="/admin/users">Nutzer</RouterLink>
             <span class="spacer"></span>
             <span class="user">{{ auth.user.name || auth.user.email }}</span>

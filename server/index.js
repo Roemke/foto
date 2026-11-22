@@ -1,3 +1,4 @@
+import { makeDupesRouter } from './dupes.js';
 import express from 'express';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -72,6 +73,7 @@ app.use('/api/admin', requireAdmin, makeAdminRouter(pool));
 app.use('/api/trash', requireAdmin, makeTrashRouter(pool));
 app.use('/api/users', requireAdmin, makeUsersRouter(pool));
 app.use('/api/sync', requireAdmin, makeSyncRouter(pool));
+app.use('/api/duplicates', requireAdmin, makeDupesRouter(pool));
 
 
 function filterParts(q) {

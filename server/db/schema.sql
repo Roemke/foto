@@ -111,3 +111,10 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
+CREATE TABLE `duplicates` (
+  `rel_path` varchar(700) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  `group_key` varchar(700) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  `found_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`rel_path`),
+  KEY `idx_group` (`group_key`(191))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

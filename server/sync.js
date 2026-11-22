@@ -96,6 +96,34 @@ async function findDuplicates(pool, added, disk) {
   return dups
 }
 
+async function recordDuplicates(pool, dups) {
+  const keyOf = new Map()
+  for (const d of dups) {
+    let key = keyOf.get(d.sameAs)
+    if (!key) {
+      const [r] = await pool.query('SELECT group_key FROM duplicates WHERE rel_path = ?', [
+        d.sameAs,
+      ])
+      key = r.length ? r[0].group_key : d.sameAs
+    }
+    keyOf.set(d.sameAs, key)
+    keyOf.set(d.rel, key)
+    await pool.query('INSERT IGNORE INTO duplicates (rel_path, group_key) VALUES (?, ?), (?, ?)', [
+      d.sameAs,
+      key,
+      d.rel,
+      key,
+    ])
+  }
+}
+
+async function cleanDuplicates(pool) {
+  await pool.query('DELETE FROM duplicates WHERE rel_path NOT IN (SELECT rel_path FROM photos)')
+  await pool.query(
+    'DELETE FROM duplicates WHERE group_key IN (SELECT group_key FROM (SELECT group_key FROM duplicates GROUP BY group_key HAVING COUNT(*) < 2) t)',
+  )
+}
+
 export async function syncArchive(pool, { dryRun = false, force = false } = {}) {
   if (running) throw new Error('Abgleich läuft bereits')
   running = true
@@ -154,6 +182,7 @@ export async function syncArchive(pool, { dryRun = false, force = false } = {}) 
       for (const x of await indexFiles(pool, added.slice(i, i + BATCH)))
         if (x.error) res.errors.push(x)
     }
+    await recordDuplicates(pool, dups)
     await dropThumbs(changed.map((r) => r.id))
     const paths = changed.map((r) => r.rel_path)
     for (let i = 0; i < paths.length; i += BATCH) {
@@ -167,6 +196,7 @@ export async function syncArchive(pool, { dryRun = false, force = false } = {}) 
       await dropThumbs(ids)
       res.removed = ids.length
     }
+    await cleanDuplicates(pool)
     const cmd = process.env.NEXTCLOUD_SCAN_CMD
     if (cmd) {
       try {

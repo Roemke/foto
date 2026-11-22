@@ -4,6 +4,7 @@ import UploadView from '../views/UploadView.vue'
 import AdminTagsView from '../views/AdminTagsView.vue'
 import TrashView from '../views/TrashView.vue'
 import UsersView from '../views/UsersView.vue'
+import DupesView from '../views/DupesView.vue'
 import ImpressumView from '../views/ImpressumView.vue'
 import DatenschutzView from '../views/DatenschutzView.vue'
 
@@ -15,6 +16,7 @@ const router = createRouter({
     { path: '/admin/tags', name: 'admin-tags', component: AdminTagsView },
     { path: '/trash', name: 'trash', component: TrashView },
     { path: '/admin/users', name: 'admin-users', component: UsersView },
+    { path: '/admin/duplicates', name: 'admin-duplicates', component: DupesView },
     { path: '/impressum', name: 'impressum', component: ImpressumView, meta: { public: true } },
     {
       path: '/datenschutz',
