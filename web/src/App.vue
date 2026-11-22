@@ -37,8 +37,8 @@ onMounted(() => auth.load())
           <a class="btn" href="/api/auth/login">Mit Microsoft anmelden</a>
           <p class="left">
             Beachten Sie: Dieser Zugang ist nur für Kolleginnen und Kollegen möglich. Er nutzt
-            denselben Datenbestand wie die GFSCloud im Pfad
-	    0-photosGFS/Bilder (der für neue Bilder vereinbarte Pfad)
+            denselben Datenbestand wie die GFSCloud im Pfad 0-photosGFS/Bilder (der für neue Bilder
+            vereinbarte Pfad)
           </p>
         </div>
       </template>
@@ -138,6 +138,6 @@ onMounted(() => auth.load())
   color: #555;
 }
 p.left {
-  text-align: left
+  text-align: left;
 }
 </style>

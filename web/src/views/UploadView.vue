@@ -12,6 +12,8 @@ const busy = ref(false)
 const result = ref(null)
 const error = ref('')
 const drag = ref(false)
+const progress = ref(0)
+const phase = ref('')
 
 async function loadTags() {
   const r = await fetch('/api/tags')
@@ -46,7 +48,39 @@ function toggle(id) {
 const count = (g) => g.tags.filter((t) => selected.value.has(t.id)).length
 const size = computed(() => files.value.reduce((a, f) => a + f.size, 0))
 const mb = (n) => (n / 1048576).toFixed(1) + ' MB'
+const label = computed(() =>
+  busy.value
+    ? phase.value === 'upload'
+      ? `Lade hoch … ${progress.value} %`
+      : 'Verarbeite …'
+    : files.value.length + ' Foto(s) hochladen',
+)
 const canSend = computed(() => files.value.length > 0 && anlass.value.trim() && !busy.value)
+
+function post(fd) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest()
+    x.open('POST', '/api/upload')
+    x.upload.onprogress = (e) => {
+      if (e.lengthComputable) progress.value = Math.round((e.loaded / e.total) * 100)
+    }
+    x.upload.onload = () => {
+      progress.value = 100
+      phase.value = 'verarbeite'
+    }
+    x.onload = () => {
+      let json = null
+      try {
+        json = JSON.parse(x.responseText)
+      } catch {
+        json = null
+      }
+      resolve({ ok: x.status >= 200 && x.status < 300, json })
+    }
+    x.onerror = () => reject(new Error('Verbindung fehlgeschlagen'))
+    x.send(fd)
+  })
+}
 
 async function send() {
   busy.value = true
@@ -60,10 +94,11 @@ async function send() {
   fd.append('eventTag', eventTag.value ? '1' : '0')
   for (const f of files.value) fd.append('files', f)
   try {
-    const r = await fetch('/api/upload', { method: 'POST', body: fd })
-    const j = await r.json()
-    if (!r.ok) {
-      error.value = j.error || 'Fehler beim Hochladen'
+    progress.value = 0
+    phase.value = 'upload'
+    const { ok, json: j } = await post(fd)
+    if (!ok) {
+      error.value = j?.error || 'Fehler beim Hochladen'
     } else {
       result.value = j
       files.value = []
@@ -73,6 +108,7 @@ async function send() {
     error.value = 'Verbindung fehlgeschlagen'
   }
   busy.value = false
+  phase.value = ''
 }
 </script>
 
@@ -123,9 +159,23 @@ async function send() {
     </div>
 
     <button class="go" :disabled="!canSend" @click="send">
-      {{ busy ? 'Lade hoch …' : files.length + ' Foto(s) hochladen' }}
+      {{ label }}
     </button>
     <p v-if="error" class="err">{{ error }}</p>
+    <div v-if="busy" class="prog">
+      <div class="track">
+        <div
+          class="bar"
+          :class="{ work: phase !== 'upload' }"
+          :style="{ width: (phase === 'upload' ? progress : 100) + '%' }"
+        ></div>
+      </div>
+      <small>{{
+        phase === 'upload'
+          ? progress + ' % von ' + mb(size)
+          : 'Fotos werden verarbeitet, bitte warten …'
+      }}</small>
+    </div>
 
     <h2>Tags für alle Fotos</h2>
     <details v-for="g in groups" :key="g.id">
@@ -146,9 +196,23 @@ async function send() {
     </details>
 
     <button class="go" :disabled="!canSend" @click="send">
-      {{ busy ? 'Lade hoch …' : files.length + ' Foto(s) hochladen' }}
+      {{ label }}
     </button>
     <p v-if="error" class="err">{{ error }}</p>
+    <div v-if="busy" class="prog">
+      <div class="track">
+        <div
+          class="bar"
+          :class="{ work: phase !== 'upload' }"
+          :style="{ width: (phase === 'upload' ? progress : 100) + '%' }"
+        ></div>
+      </div>
+      <small>{{
+        phase === 'upload'
+          ? progress + ' % von ' + mb(size)
+          : 'Fotos werden verarbeitet, bitte warten …'
+      }}</small>
+    </div>
 
     <section v-if="result" class="res">
       <h2>
@@ -321,5 +385,33 @@ summary {
 .err,
 .bad {
   color: #b42318;
+}
+.prog {
+  margin-top: 0.6rem;
+}
+.track {
+  background: #e5e7eb;
+  border-radius: 999px;
+  height: 0.6rem;
+  overflow: hidden;
+}
+.bar {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s;
+}
+.bar.work {
+  animation: puls 1s ease-in-out infinite alternate;
+}
+@keyframes puls {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.prog small {
+  color: #6b7280;
 }
 </style>
