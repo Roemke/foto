@@ -35,9 +35,11 @@ onMounted(() => auth.load())
           <p v-if="loginMsg === 'denied'" class="err">Dieses Konto hat keinen Zugang.</p>
           <p v-else-if="loginMsg === 'failed'" class="err">Anmeldung fehlgeschlagen.</p>
           <a class="btn" href="/api/auth/login">Mit Microsoft anmelden</a>
-	  <p> Beachten Sie: Dieser Zugang ist nur für Kolleginnen und
-          Kollegen möglich. Er nutzt denselben Datenbestand wie die
-          GFSCloud/Fotos</p>
+          <p class="left">
+            Beachten Sie: Dieser Zugang ist nur für Kolleginnen und Kollegen möglich. Er nutzt
+            denselben Datenbestand wie die GFSCloud im Pfad
+	    0-photosGFS/Bilder (der für neue Bilder vereinbarte Pfad)
+          </p>
         </div>
       </template>
     </div>
@@ -86,7 +88,7 @@ onMounted(() => auth.load())
 }
 .user {
   font-weight: 400;
-  font-size: 0.9rem;
+  font-size: 1.1rem;
 }
 .out {
   background: transparent;
@@ -103,6 +105,7 @@ onMounted(() => auth.load())
   text-align: center;
   border: 1px solid #ddd;
   border-radius: 8px;
+  font-size: 1.2rem;
 }
 .err {
   color: #b00020;
@@ -127,11 +130,14 @@ onMounted(() => auth.load())
   gap: 1.2rem;
   align-items: center;
   justify-content: center;
-  font-size: 0.85rem;
+  font-size: 0.985rem;
   background: #fff;
   border-top: 1px solid #e3e6ea;
 }
 .foot a {
   color: #555;
+}
+p.left {
+  text-align: left
 }
 </style>

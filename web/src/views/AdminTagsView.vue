@@ -85,6 +85,7 @@ async function saveEdit(t) {
   if (name && name !== t.name) await act('PATCH', `/tags/${t.id}`, { name })
 }
 const toggleActive = (t) => act('PATCH', `/tags/${t.id}`, { active: !t.active })
+const toggleLegacy = (t) => act('PATCH', `/tags/${t.id}`, { legacy: !t.legacy })
 const toggleVisible = (g) => act('PATCH', `/groups/${g.id}`, { visible: !g.visible })
 
 async function moveGroup(g, d) {
@@ -181,6 +182,9 @@ async function removeTag(t) {
           <small class="cnt">{{ t.count }}</small>
           <small v-if="t.legacy" class="lg">Alt</small>
           <span class="acts">
+            <button @click="toggleLegacy(t)">
+              {{ t.legacy ? 'Übernehmen' : 'Als Alt markieren' }}
+            </button>
             <button @click="toggleActive(t)">{{ t.active ? 'Ausblenden' : 'Einblenden' }}</button>
             <button @click="openMerge(t)">Zusammenführen</button>
             <select @change="moveTag(t, $event)">

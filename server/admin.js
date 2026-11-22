@@ -199,6 +199,9 @@ export function makeAdminRouter(pool) {
     if (req.body.active !== undefined) {
       await pool.query('UPDATE tags SET active = ? WHERE id = ?', [req.body.active ? 1 : 0, id]);
     }
+    if (req.body.legacy !== undefined) {
+      await pool.query('UPDATE tags SET legacy = ? WHERE id = ?', [req.body.legacy ? 1 : 0, id]);
+    }
     if (!moves) return res.json({ ok: true, files: 0 });
 
     const photos = await photosOf(id);
