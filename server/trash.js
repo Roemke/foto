@@ -3,6 +3,7 @@ import sharp from 'sharp';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { indexFiles } from './indexfile.js';
+import { scanNextcloud } from './ncscan.js';
 
 const ROOT = process.env.PHOTO_ROOT;
 const TRASH = process.env.TRASH_DIR;
@@ -48,6 +49,7 @@ export function makeTrashRouter(pool) {
     const [photos] = await pool.query('SELECT id, rel_path FROM photos WHERE id IN (?)', [ids]);
     const failed = [];
     let moved = 0;
+    const movedRels = [];
     for (const p of photos) {
       try {
         const dest = await freeName(path.join(TRASH, p.rel_path));
@@ -58,10 +60,12 @@ export function makeTrashRouter(pool) {
         ]);
         await pool.query('DELETE FROM photos WHERE id = ?', [p.id]);
         moved++;
+        movedRels.push(p.rel_path);
       } catch (e) {
         failed.push({ id: p.id, rel_path: p.rel_path, error: e.message });
       }
     }
+    scanNextcloud(movedRels);
     res.json({ moved, failed });
   });
 
@@ -115,6 +119,7 @@ export function makeTrashRouter(pool) {
         await pool.query('DELETE FROM trash WHERE id = ?', [batch[k].trashId]);
       }
     }
+    scanNextcloud(restored.map((r) => r.rel));
     res.json({ restored: restored.length, failed });
   });
 
