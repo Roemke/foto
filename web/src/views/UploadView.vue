@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
 
 const files = ref([])
 const anlass = ref('')
@@ -10,6 +10,7 @@ const groups = ref([])
 const selected = ref(new Set())
 const busy = ref(false)
 const result = ref(null)
+const resEl = ref(null)
 const error = ref('')
 const drag = ref(false)
 const progress = ref(0)
@@ -133,6 +134,8 @@ async function send() {
       result.value = j
       files.value = []
       loadTags()
+      await nextTick()
+      resEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   } catch {
     error.value = 'Verbindung fehlgeschlagen'
@@ -206,6 +209,20 @@ async function send() {
       }}</small>
     </div>
 
+    <section v-if="result" ref="resEl" class="res">
+      <h2>
+        {{ result.ok }} gespeichert<span v-if="result.failed"
+          >, {{ result.failed }} fehlgeschlagen</span
+        >
+      </h2>
+      <ul>
+        <li v-for="(f, i) in result.files" :key="i" :class="{ bad: f.error }">
+          {{ f.name }} → {{ f.error ?? f.rel ?? 'bereits vorhanden: ' + f.duplicate }}
+          <small v-if="f.source === 'manual'">(Datum für alle)</small>
+        </li>
+      </ul>
+    </section>
+
     <h2>Tags für alle Fotos</h2>
     <details v-for="g in groups" :key="g.id">
       <summary>
@@ -242,20 +259,6 @@ async function send() {
           : 'Fotos werden verarbeitet, bitte warten …'
       }}</small>
     </div>
-
-    <section v-if="result" class="res">
-      <h2>
-        {{ result.ok }} gespeichert<span v-if="result.failed"
-          >, {{ result.failed }} fehlgeschlagen</span
-        >
-      </h2>
-      <ul>
-        <li v-for="(f, i) in result.files" :key="i" :class="{ bad: f.error }">
-          {{ f.name }} → {{ f.error ?? f.rel ?? 'bereits vorhanden: ' + f.duplicate }}
-          <small v-if="f.source === 'manual'">(Datum für alle)</small>
-        </li>
-      </ul>
-    </section>
   </main>
 </template>
 
@@ -264,6 +267,9 @@ async function send() {
   max-width: 760px;
   margin: 1.5rem auto;
   padding: 0 1rem;
+}
+.res {
+  scroll-margin-top: 4rem;
 }
 .drop {
   border: 2px dashed #c5cbd6;
