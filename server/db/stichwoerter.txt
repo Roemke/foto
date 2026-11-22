@@ -37,31 +37,58 @@ Klasse
   AG22z
   AG23a
   AG23b
-  AG23Z
+  AG24a
+  AG25a
+  AG26a
+  AG24b
+  AG25b
+  AG26b
+  AG23z
+  AG24z
+  AG25z
+  AG26z
   AM21
   AM22
   AM23
+  AM24
+  AM25
+  AM26
   BF21
   BF22
   BF23a
   BF23b
   BF24
+  BF25a
+  BF25b
+  BF26a
+  BF26b
   BG19
   BG20
   BG21
   BG22
   BG23
+  BG24a
+  BG24b
+  BG25a
+  BG25b
+  BG26 
   FH23
   FH25
+  FH26
   FM23
   GF21
   GF22
   GF23
   GF24
+  GF24
+  GF25
+  GF26
   GH21
   GH22
   GH23
   GH24
+  GH25
+  GH26
   GV21
   GV22a
   GV22b
@@ -69,6 +96,10 @@ Klasse
   GV23b
   GV24a
   GV24b
+  GV25a
+  GV25b
+  GV26a
+  GV26b
 Ort
   andere Orte
   Mensa
