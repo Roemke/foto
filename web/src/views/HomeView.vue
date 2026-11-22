@@ -118,8 +118,21 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 const selected = ref(new Set())
 let anchor = null
 
+const query = ref(store.q)
+let searchTimer = null
+function onSearch() {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => store.setQuery(query.value), 350)
+}
 watch(
-  () => [store.rating, [...store.selectedTags], store.from, store.to],
+  () => store.q,
+  (v) => {
+    if (v !== query.value) query.value = v
+  },
+)
+
+watch(
+  () => [store.rating, [...store.selectedTags], store.from, store.to, store.q],
   () => {
     selected.value = new Set()
     anchor = null
@@ -253,6 +266,15 @@ function groupOpen(g) {
   <div class="layout">
     <aside class="filters">
       <h2>Filter</h2>
+      <div class="search">
+        <input
+          v-model="query"
+          type="search"
+          placeholder="Suchen: Tag, Datum, Ordner …"
+          @input="onSearch"
+        />
+        <small v-if="store.q.trim()">Suche über alle Jahre</small>
+      </div>
       <div class="resets">
         <button class="reset" @click="store.reset()">Filter zurücksetzen</button>
         <button class="reset" @click="store.allYears()">Alle Jahre</button>
@@ -618,6 +640,22 @@ figure.selected {
 .selbar button:disabled {
   opacity: 0.5;
   cursor: default;
+}
+.search {
+  display: grid;
+  gap: 0.2rem;
+  margin-bottom: 0.6rem;
+}
+.search input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d9dde5;
+  border-radius: 8px;
+  padding: 0.4rem 0.5rem;
+  font: inherit;
+}
+.search small {
+  color: #6b7280;
 }
 .resets {
   display: flex;

@@ -15,14 +15,24 @@ export const usePhotosStore = defineStore('photos', () => {
   const selectedTags = ref([])
   const from = ref(DEFAULT_FROM)
   const to = ref(DEFAULT_TO)
+  const q = ref('')
   let seq = 0
+
+  // Mit Suchbegriff gilt die Suche für alle Jahre, ohne Begriff der eingestellte Zeitraum.
+  function addRange(p) {
+    if (q.value.trim()) {
+      p.set('q', q.value.trim())
+      return
+    }
+    if (from.value) p.set('from', from.value)
+    if (to.value) p.set('to', to.value)
+  }
 
   async function loadTags() {
     const p = new URLSearchParams()
     if (rating.value) p.set('rating', rating.value)
     if (selectedTags.value.length) p.set('tags', selectedTags.value.join(','))
-    if (from.value) p.set('from', from.value)
-    if (to.value) p.set('to', to.value)
+    addRange(p)
     const r = await fetch('/api/tags?' + p)
     groups.value = await r.json()
   }
@@ -31,8 +41,7 @@ export const usePhotosStore = defineStore('photos', () => {
     const p = new URLSearchParams({ limit: PAGE, offset })
     if (rating.value) p.set('rating', rating.value)
     if (selectedTags.value.length) p.set('tags', selectedTags.value.join(','))
-    if (from.value) p.set('from', from.value)
-    if (to.value) p.set('to', to.value)
+    addRange(p)
     return p
   }
 
@@ -61,11 +70,17 @@ export const usePhotosStore = defineStore('photos', () => {
     load()
   }
 
+  function setQuery(v) {
+    q.value = v
+    load()
+  }
+
   function reset() {
     rating.value = 0
     selectedTags.value = []
     from.value = DEFAULT_FROM
     to.value = DEFAULT_TO
+    q.value = ''
     load()
   }
 
@@ -89,6 +104,8 @@ export const usePhotosStore = defineStore('photos', () => {
     selectedTags,
     from,
     to,
+    q,
+    setQuery,
     loadTags,
     load,
     setRating,

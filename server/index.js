@@ -76,6 +76,40 @@ app.use('/api/sync', requireAdmin, makeSyncRouter(pool));
 app.use('/api/duplicates', requireAdmin, makeDupesRouter(pool));
 
 
+function searchParts(qs) {
+  const where = [];
+  const params = [];
+  const pad = (n) => String(n).padStart(2, '0');
+  const words = String(qs ?? '').trim().split(/\s+/).filter(Boolean).slice(0, 8);
+  for (const w0 of words) {
+    const w = w0.slice(0, 60);
+    const like = `%${w.replace(/[\\%_]/g, '\\$&')}%`;
+    const or = [
+      'p.rel_path LIKE ?',
+      'p.photographer LIKE ?',
+      'EXISTS (SELECT 1 FROM photo_tags sx JOIN tags st ON st.id = sx.tag_id WHERE sx.photo_id = p.id AND st.active = 1 AND st.name LIKE ?)',
+    ];
+    const ps = [like, like, like];
+    let m;
+    if ((m = w.match(/^(\d{4})$/))) {
+      or.push('YEAR(p.taken_at) = ?');
+      ps.push(Number(m[1]));
+    } else if ((m = w.match(/^(\d{4})-(\d{1,2})$/))) {
+      or.push('(YEAR(p.taken_at) = ? AND MONTH(p.taken_at) = ?)');
+      ps.push(Number(m[1]), Number(m[2]));
+    } else if ((m = w.match(/^(\d{1,2})\.(\d{4})$/))) {
+      or.push('(YEAR(p.taken_at) = ? AND MONTH(p.taken_at) = ?)');
+      ps.push(Number(m[2]), Number(m[1]));
+    } else if ((m = w.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/))) {
+      or.push('DATE(p.taken_at) = ?');
+      ps.push(`${m[3]}-${pad(m[2])}-${pad(m[1])}`);
+    }
+    where.push(`(${or.join(' OR ')})`);
+    params.push(...ps);
+  }
+  return { where, params };
+}
+
 function filterParts(q) {
   const where = [];
   const params = [];
@@ -97,6 +131,9 @@ function filterParts(q) {
     where.push('p.taken_at < DATE_ADD(?, INTERVAL 1 DAY)');
     params.push(q.to);
   }
+  const sq = searchParts(q.q);
+  where.push(...sq.where);
+  params.push(...sq.params);
   return { where, params };
 }
 
@@ -178,6 +215,9 @@ app.get('/api/photos', async (req, res) => {
     where.push('p.taken_at < DATE_ADD(?, INTERVAL 1 DAY)');
     params.push(req.query.to);
   }
+  const sq = searchParts(req.query.q);
+  where.push(...sq.where);
+  params.push(...sq.params);
   const tagIds = String(req.query.tags ?? '')
     .split(',')
     .map(Number)
