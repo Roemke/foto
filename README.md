@@ -107,6 +107,7 @@ sudo mysql schulfotos < /opt/fotos/server/db/schema.sql
 ### 4. Verzeichnisse und Konfiguration
 
 Die App-Registrierung in Entra (Abschnitt „Anmeldung mit Microsoft Entra“) muss vorher vorhanden sein, mit der Redirect-URI `https://fotos.bk-rheinbach.net/api/auth/callback`.
+Dort steht auch, wo `MANDANTEN-ID` und `ANWENDUNGS-ID` zu finden sind (Übersichtsseite der Registrierung: „Directory (tenant) ID“ und „Application (client) ID“).
 
 Cache und Papierkorb liegen außerhalb des Archivs und müssen für den Dienstbenutzer beschreibbar sein:
 
@@ -260,7 +261,7 @@ App-Registrierung im Microsoft Entra Admin Center (mindestens die Rolle
    „Register“ drücken.
 3. Auf der Übersichtsseite zwei Werte notieren:
    - „Application (client) ID“ ergibt `OIDC_CLIENT_ID`
-   - „Directory (tenant) ID“ gehört in `OIDC_ISSUER`
+   - „Directory (tenant) ID“ (die Mandanten-ID) gehört in `OIDC_ISSUER`
 4. Weitere Redirect-URIs (z. B. für die Entwicklung
    `http://localhost:5173/api/auth/callback`) unter *Manage > Authentication*
    über „Add a platform“ oder bei der Plattform „Web“ ergänzen. Es können
@@ -283,7 +284,7 @@ lassen sich weiterverwenden, oder der Server bekommt ein eigenes Geheimnis.
 ### Werte in `server/.env`
 
 ```
-OIDC_ISSUER=https://login.microsoftonline.com/VERZEICHNIS-ID/v2.0
+OIDC_ISSUER=https://login.microsoftonline.com/MANDANTEN-ID/v2.0
 OIDC_CLIENT_ID=ANWENDUNGS-ID
 OIDC_CLIENT_SECRET=WERT-DES-GEHEIMNISSES
 OIDC_REDIRECT_URI=https://fotos.bk-rheinbach.net/api/auth/callback
