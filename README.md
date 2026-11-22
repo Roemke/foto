@@ -221,6 +221,66 @@ lokalen Netz muss der Name intern auf denselben Proxy zeigen, nicht direkt auf
 den Server, damit auch dort HTTPS genutzt wird. Danach lässt sich die
 Anmeldung im Browser unter `https://fotos.bk-rheinbach.net` testen.
 
+**Beispiel: vorgeschalteter Apache-Proxy mit Let's Encrypt**
+
+Der Proxy beendet TLS und reicht die Anfragen per HTTP an den Server weiter.
+Zuerst ein Block für Port 80 (Zertifikatsprüfung und Umleitung auf HTTPS),
+in `/etc/apache2/sites-available/fotos.conf` des Proxys:
+
+```
+<VirtualHost *:80>
+    ServerName fotos.bk-rheinbach.net
+
+    Alias /.well-known/acme-challenge/ /var/www/html/.well-known/acme-challenge/
+    <Directory /var/www/html/.well-known/acme-challenge/>
+        Require all granted
+    </Directory>
+
+    RewriteEngine On
+    RewriteCond %{REQUEST_URI} !^/.well-known/acme-challenge/
+    RewriteRule ^(.*)$ https://%{HTTP_HOST}$1 [R=301,L]
+</VirtualHost>
+```
+
+Seite aktivieren und neu laden (`a2ensite`, `apache2ctl configtest`,
+`systemctl reload apache2`), den DNS-Eintrag für den Namen anlegen und dann
+das Zertifikat holen:
+
+```bash
+sudo certbot certonly --webroot -w /var/www/html -d fotos.bk-rheinbach.net
+```
+
+Danach den Block für Port 443 an dieselbe Datei anhängen. `ADRESSE-DES-SERVERS`
+ist die Adresse des Servers mit der App aus Sicht des Proxys:
+
+```
+<VirtualHost *:443>
+    ServerName fotos.bk-rheinbach.net
+
+    SSLEngine on
+    SSLCertificateFile /etc/letsencrypt/live/fotos.bk-rheinbach.net/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/fotos.bk-rheinbach.net/privkey.pem
+    Include /etc/letsencrypt/options-ssl-apache.conf
+
+    ProxyPreserveHost On
+    ProxyPass / http://ADRESSE-DES-SERVERS/
+    ProxyPassReverse / http://ADRESSE-DES-SERVERS/
+
+    RequestHeader set X-Forwarded-Proto "https"
+</VirtualHost>
+```
+
+`X-Forwarded-Proto` muss fest gesetzt werden, `mod_proxy` liefert diesen
+Header nicht selbst. WebSockets braucht die Anwendung nicht. Die Module
+`proxy`, `proxy_http`, `headers`, `rewrite` und `ssl` müssen auf dem Proxy
+aktiv sein. Test von außen:
+
+```bash
+curl -si https://fotos.bk-rheinbach.net/api/health | head -1
+```
+
+Erwartet: `HTTP/1.1 200 OK`.
+
 ### 7. Archiv einlesen (Abgleich)
 
 Die Vorlagen für den Abgleich liegen in `deploy/`. Zuerst ein Trockenlauf, der auch die Schreibrechte und die Konfiguration prüft. Er kann bei großen Archiven dauern, daher mit niedriger Priorität:
