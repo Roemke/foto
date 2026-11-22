@@ -85,6 +85,26 @@ sudo apt install nodejs
 node -v
 ```
 
+**Prozessor (virtuelle Maschinen)**
+
+Die Bibliothek `sharp` (Thumbnails) bringt für Linux x64 fertige Programme
+mit, die einen Prozessor mit SSE4.2 voraussetzen (Mikroarchitektur
+`x86-64-v2`). Läuft der Server als virtuelle Maschine, darf deren CPU-Typ
+nicht zu einfach sein. Der Proxmox-Typ `kvm64` genügt nicht, der Dienst
+bricht dann beim Start mit dieser Meldung ab:
+
+```
+Could not load the "sharp" module using the linux-x64 runtime
+Unsupported CPU: Prebuilt binaries for Linux x64 require v2 microarchitecture
+```
+
+In Proxmox den CPU-Typ der VM auf `x86-64-v2-AES` (oder `host`) stellen und
+die VM komplett herunterfahren und neu starten. Prüfen im Gastsystem:
+
+```bash
+grep -m1 -qw sse4_2 /proc/cpuinfo && echo ok
+```
+
 ### 2. Code holen und bauen
 
 ```bash
