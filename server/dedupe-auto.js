@@ -61,6 +61,7 @@ for (const members of groups.values()) {
   members.sort((a, b) => rank(a.rel) - rank(b.rel) || (a.rel < b.rel ? -1 : 1));
   const keep = members[0];
   for (const v of members.slice(1)) {
+    if (rank(v.rel) === 0) continue;
     if (String(v.size) !== String(keep.size)) skipped++;
     else victims.push({ ...v, keep: keep.rel });
   }
