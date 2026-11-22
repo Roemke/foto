@@ -236,6 +236,17 @@ app.get('/api/photos', async (req, res) => {
   }
   const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
+  if (sq.where.length && offset === 0) {
+    const [[rg]] = await pool.query(
+      `SELECT DATE_FORMAT(MIN(p.taken_at), '%Y-%m-%d') AS lo, DATE_FORMAT(MAX(p.taken_at), '%Y-%m-%d') AS hi
+       FROM photos p ${w}`,
+      params,
+    );
+    if (rg.lo && rg.hi) {
+      res.set('X-Date-Min', rg.lo);
+      res.set('X-Date-Max', rg.hi);
+    }
+  }
   const [[{ n: total }]] = await pool.query(`SELECT COUNT(*) AS n FROM photos p ${w}`, params);
   const [photos] = await pool.query(
     `SELECT p.id, p.file_name, p.taken_at, p.date_source, p.date_precision, p.rating, p.width, p.height

@@ -35,11 +35,25 @@ onMounted(() => auth.load())
           <p v-if="loginMsg === 'denied'" class="err">Dieses Konto hat keinen Zugang.</p>
           <p v-else-if="loginMsg === 'failed'" class="err">Anmeldung fehlgeschlagen.</p>
           <a class="btn" href="/api/auth/login">Mit Microsoft anmelden</a>
-          <p class="left">
-            Beachten Sie: Dieser Zugang ist nur für Kolleginnen und Kollegen möglich. Er nutzt
-            denselben Datenbestand wie die GFSCloud im Pfad 0-photosGFS/Bilder (der für neue Bilder
-            vereinbarte Pfad)
-          </p>
+          <div class="left">
+            Beachten Sie:
+            <ul>
+              <li>Dieser Zugang ist nur für Kolleginnen und Kollegen möglich.</li>
+              <li>
+                Es wird derselbe Datenbestand wie in der GFSCloud im Pfad 0-photosGFS/Bilder (der
+                für neue Bilder vereinbarte Pfad) genutzt.
+              </li>
+              <li>Änderungen über diese APP sind nach wenigen Sekunden in der GFSCloud sichtbar</li>
+              <li>
+                Änderungen in der GFSCloud, z.B. über die Bridge, werden erst über Nacht in die
+                Datenbank übernommen. Sie sind damit am nächsten Tag hier sichtbar.
+              </li>
+              <li>
+                <strong>Emfpehlung:</strong> Nutzen Sie diese App, nicht die Bridge ... sagt der
+                Entwickler :-)
+              </li>
+            </ul>
+          </div>
         </div>
       </template>
     </div>
@@ -137,7 +151,7 @@ onMounted(() => auth.load())
 .foot a {
   color: #555;
 }
-p.left {
+.left {
   text-align: left;
 }
 </style>
