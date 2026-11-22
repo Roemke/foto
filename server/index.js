@@ -314,4 +314,11 @@ app.post('/api/download', express.urlencoded({ extended: false, limit: '1mb' }),
   await archive.finalize();
 });
 
+const WEB_DIST = path.resolve(process.env.WEB_DIST || '../web/dist');
+app.use(express.static(WEB_DIST));
+app.use((req, res, next) => {
+  if (req.method !== 'GET' || req.path.startsWith('/api/')) return next();
+  res.sendFile(path.join(WEB_DIST, 'index.html'), (err) => err && next());
+});
+
 app.listen(3000, '127.0.0.1', () => console.log('API auf Port 3000'));

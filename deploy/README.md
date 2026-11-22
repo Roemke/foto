@@ -8,6 +8,6 @@
 
 ## Nextcloud-Scan (optional, in server/.env)
 Läuft der Dienst als www-data:
-NEXTCLOUD_SCAN_CMD=php /var/www/nextcloud/occ groupfolders:scan 1
+NEXTCLOUD_SCAN_CMD=php /var/www/html/gfscloud/occ groupfolders:scan 1
 Sonst mit sudo -u www-data davor. Pfad zu occ und Ordner-ID prüfen
 (`occ groupfolders:list`).

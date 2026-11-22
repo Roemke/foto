@@ -8,3 +8,5 @@ Type=oneshot
 User=www-data
 WorkingDirectory=/opt/fotos/server
 ExecStart=/usr/bin/node --env-file=.env sync-cli.js
+Nice=19
+IOSchedulingClass=idle
