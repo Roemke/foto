@@ -15,6 +15,25 @@ const ROOT = process.env.PHOTO_ROOT;
 const TMP = path.resolve(process.env.UPLOAD_TMP || path.join(os.tmpdir(), 'schulfotos-upload'));
 const MAX_FILES = Number(process.env.MAX_UPLOAD || 500);
 const MAX_BYTES = 500 * 1024 * 1024;
+
+// Nextcloud nach dem Upload nur für die betroffenen Ordner einlesen (im Hintergrund).
+// NEXTCLOUD_SCAN_PATH_CMD: Befehl, an den der Pfad als letztes Argument angehängt wird.
+// NEXTCLOUD_SCAN_PATH_PREFIX: Pfad des Archivs innerhalb des Gruppenordners, z. B. /Bilder
+function scanNextcloud(rels) {
+  const cmd = process.env.NEXTCLOUD_SCAN_PATH_CMD;
+  if (!cmd || !rels.length) return;
+  const prefix = process.env.NEXTCLOUD_SCAN_PATH_PREFIX || '';
+  const dirs = [...new Set(rels.map((r) => path.dirname(r)))];
+  (async () => {
+    for (const d of dirs) {
+      try {
+        await run('sh', ['-c', cmd + ' "$1"', 'scan', `${prefix}/${d}`], { timeout: 300_000 });
+      } catch (e) {
+        console.error('upload: Nextcloud-Scan fehlgeschlagen', d, e.message);
+      }
+    }
+  })();
+}
 const MONTHS = [
   'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
   'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
@@ -254,6 +273,7 @@ export function makeUploadRouter(pool) {
           files.push({ name: inp.name, error: e.message });
         }
       }
+      scanNextcloud(files.filter((f) => f.rel).map((f) => f.rel));
       res.json({
         ok: files.filter((f) => f.rel).length,
         failed: files.filter((f) => f.error).length,

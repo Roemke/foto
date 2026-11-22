@@ -328,6 +328,8 @@ Im Browser `https://fotos.bk-rheinbach.net` öffnen und mit einem Konto aus `INI
 | `INITIAL_ADMINS` | Mail-Adressen der ersten Admins, danach Pflege in der App |
 | `SESSION_SECRET` | langer Zufallswert, z. B. `openssl rand -hex 32` |
 | `NEXTCLOUD_SCAN_CMD` | optional, Befehl für einen Nextcloud-Scan nach dem Abgleich |
+| `NEXTCLOUD_SCAN_PATH_CMD` | optional, Befehl für einen Nextcloud-Scan nur der Upload-Ordner, der Pfad wird als letztes Argument angehängt, z. B. `php /var/www/html/gfscloud/occ groupfolders:scan 1 -p` |
+| `NEXTCLOUD_SCAN_PATH_PREFIX` | optional, Pfad des Archivs innerhalb des Gruppenordners, z. B. `/Bilder` |
 | `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS` | Zugang zur MariaDB-Datenbank |
 | `THUMB_DIR` | Verzeichnis für den Thumbnail-Cache, muss für den Dienst beschreibbar sein |
 | `UPLOAD_TMP` | optional, Zwischenverzeichnis für Uploads (Standard: temporäres Verzeichnis des Systems) |
