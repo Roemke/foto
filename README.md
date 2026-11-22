@@ -52,13 +52,37 @@ Webserver für die Dateien ist nicht nötig. Der Apache leitet nur weiter.
 ### 1. Voraussetzungen
 
 - Git
-- Node.js `^20.19` oder `>=22.12` (Vorgabe von Vite für den Build; der Server nutzt außerdem `--env-file`)
+- Node.js `^20.19` oder `>=22.12` (Vorgabe von Vite für den Build; der Server nutzt außerdem `--env-file`), Installation siehe unten
 - MariaDB
 - exiftool (Ubuntu: `sudo apt install libimage-exiftool-perl`)
 - Apache mit den Modulen `proxy`, `proxy_http` und `headers`:
 
 ```bash
+node -v; mysql --version; exiftool -ver; apache2 -v | head -1; git --version
+```
+
+
+```bash
 sudo a2enmod proxy proxy_http headers
+```
+
+**Node.js installieren (Ubuntu)**
+
+Auf dem Beispielserver (Ubuntu 24.04) liefert `apt` nur Node 18.19.1. Das ist
+für den Build zu alt (Vite verlangt `^20.19` oder `>=22.12`). Daher kommt Node
+24 (LTS) aus dem NodeSource-Repository. Es liegt danach unter `/usr/bin/node`,
+wie es die Dienstdatei erwartet. `nvm` eignet sich dafür nicht, weil der Dienst
+als `www-data` läuft und nicht an einen Node-Pfad im Home-Verzeichnis kommt.
+
+Das Skript vor dem Ausführen ansehen. Bei der Installation prüfen, welche
+Pakete `apt` entfernen will, bevor sie bestätigt wird.
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_24.x -o nodesource_setup.sh
+less nodesource_setup.sh
+sudo bash nodesource_setup.sh
+sudo apt install nodejs
+node -v
 ```
 
 ### 2. Code holen und bauen
