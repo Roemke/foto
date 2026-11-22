@@ -283,6 +283,14 @@ Erwartet: `HTTP/1.1 200 OK`.
 
 ### 7. Archiv einlesen (Abgleich)
 
+Zuerst einmalig die Stichwortliste anlegen (`server/db/stichwoerter.txt`). Das muss vor dem ersten Abgleich geschehen. Beim Hochladen bietet die App nur Stichwörter an, die nicht als „Alt“ markiert sind, also die aus der Liste und die in der App neu angelegten. Stichwörter, die der Import in den Fotos findet und die nicht in der Liste stehen, gelten als „Alt“ und werden beim Hochladen nicht angeboten.
+
+```bash
+cd /opt/fotos/server && sudo -u www-data node --env-file=.env db/seed-tags.js
+```
+
+Erwartet: eine Zeile `Gruppen: …, Tags: …`.
+
 Die Vorlagen für den Abgleich liegen in `deploy/`. Zuerst ein Trockenlauf, der auch die Schreibrechte und die Konfiguration prüft. Er kann bei großen Archiven dauern, daher mit niedriger Priorität:
 
 ```bash
