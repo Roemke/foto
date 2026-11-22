@@ -10,7 +10,9 @@ const PRIO = [
   'BilderBis2022Unsorted/archivWernerSchmickler/',
   'BilderBis2022Unsorted/BensDaten/',
 ];
-const rank = (rel) => PRIO.findIndex((p) => rel.startsWith(p)) + 1;
+const LOSE = ['BilderBis2022Unsorted/2019/02/'];
+const rank = (rel) =>
+  LOSE.some((p) => rel.startsWith(p)) ? 4 : PRIO.findIndex((p) => rel.startsWith(p)) + 1;
 const top2 = (rel) => rel.split('/').slice(0, 2).join('/');
 
 async function moveFile(src, dest) {
@@ -61,7 +63,7 @@ for (const members of groups.values()) {
   members.sort((a, b) => rank(a.rel) - rank(b.rel) || (a.rel < b.rel ? -1 : 1));
   const keep = members[0];
   for (const v of members.slice(1)) {
-    if (rank(v.rel) === 0) continue;
+    if (rank(v.rel) === 0 && path.dirname(v.rel) !== path.dirname(keep.rel)) continue;
     if (String(v.size) !== String(keep.size)) skipped++;
     else victims.push({ ...v, keep: keep.rel });
   }
