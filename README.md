@@ -9,7 +9,7 @@ Webanwendung zur Verwaltung des Foto-Archivs einer Schule. Sie ersetzt die bishe
 - Foto-Raster mit Filtern (u. a. nach Zeitraum und Tags) und Großansicht
 - Upload von Fotos
 - Papierkorb mit Wiederherstellung
-- Tag-Verwaltung
+- Tag-Verwaltung, auch zum Übernehmen von Alt-Tags aus den Fotos in die kuratierte Liste
 - Nutzerverwaltung (Admin)
 - Archiv-Abgleich zwischen Dateisystem und Datenbank, nächtlich und manuell auslösbar
 - Dublettenerkennung mit Verwaltungsseite zum Aufräumen
@@ -32,6 +32,7 @@ Webanwendung zur Verwaltung des Foto-Archivs einer Schule. Sie ersetzt die bishe
 - Sitzungen liegen im Arbeitsspeicher. Nach einem Neustart des Servers müssen sich alle Nutzer neu anmelden.
 - Zugriff hat jedes Konto der erlaubten Domain. Eine Prüfung der Gruppenmitgliedschaft gibt es nicht.
 - Dubletten sind byte-identische Dateien. Ein verkleinertes oder neu gespeichertes Foto gilt als anderes Foto.
+- Die Papierkorb-Seite zeigt nur die neuesten 1000 Einträge.
 - Impressum und Datenschutzerklärung sind Entwurfstexte und müssen vor dem Produktivbetrieb geprüft werden.
 
 ## Installation
@@ -129,7 +130,7 @@ sudo mysql schulfotos < /opt/fotos/server/db/schema.sql
 Die App-Registrierung in Entra (Abschnitt „Anmeldung mit Microsoft Entra“) muss vorher vorhanden sein, mit der Redirect-URI `https://fotos.bk-rheinbach.net/api/auth/callback`.
 Dort steht auch, wo `MANDANTEN-ID` und `ANWENDUNGS-ID` zu finden sind (Übersichtsseite der Registrierung: „Directory (tenant) ID“ und „Application (client) ID“).
 
-Cache und Papierkorb liegen außerhalb des Archivs und müssen für den Dienstbenutzer beschreibbar sein:
+Cache und Papierkorb liegen außerhalb des Archivs und müssen für den Dienstbenutzer beschreibbar sein. Der Papierkorb gehört am besten auf dasselbe Dateisystem wie das Archiv, sonst wird beim Löschen kopiert statt verschoben und der Platz dort muss reichen. Im Beispiel liegen beide unter `/var`:
 
 ```bash
 sudo mkdir -p /var/cache/schulfotos /var/lib/schulfotos/papierkorb
@@ -283,7 +284,7 @@ Erwartet: `HTTP/1.1 200 OK`.
 
 ### 7. Archiv einlesen (Abgleich)
 
-Zuerst einmalig die Stichwortliste anlegen (`server/db/stichwoerter.txt`). Das muss vor dem ersten Abgleich geschehen. Beim Hochladen bietet die App nur Stichwörter an, die nicht als „Alt“ markiert sind, also die aus der Liste und die in der App neu angelegten. Stichwörter, die der Import in den Fotos findet und die nicht in der Liste stehen, gelten als „Alt“ und werden beim Hochladen nicht angeboten.
+Zuerst einmalig die Stichwortliste anlegen (`server/db/stichwoerter.txt`). Das muss vor dem ersten Abgleich geschehen. Beim Hochladen bietet die App nur Stichwörter an, die nicht als „Alt“ markiert sind, also die aus der Liste und die in der App neu angelegten. Stichwörter, die der Import in den Fotos findet und die nicht in der Liste stehen, gelten als „Alt“ und werden beim Hochladen nicht angeboten. In der Tag-Verwaltung lässt sich ein Alt-Tag mit „Übernehmen“ in die kuratierten Tags übernehmen.
 
 ```bash
 cd /opt/fotos/server && sudo -u www-data node --env-file=.env db/seed-tags.js
@@ -306,6 +307,8 @@ sudo systemctl start --no-block schulfotos-sync.service
 journalctl -u schulfotos-sync.service -f
 sudo systemctl enable --now schulfotos-sync.timer
 ```
+
+Das Ergebnis am Ende des Laufs im Journal prüfen: `errors` und `notes` müssen leer sein, `added` entspricht der Zahl der JPEG-Dateien. Die Notiz „Ordner nicht lesbar: nichts wird entfernt“ bedeutet, dass der Dienstbenutzer einen Ordner oder eine Datei nicht lesen konnte. Die betroffenen Fotos fehlen dann in der Datenbank. Ein Beispiel ist ein Ordner ohne Execute-Recht (`chmod 755 ORDNER`). Danach den Abgleich erneut starten, er holt die fehlenden Dateien nach.
 
 ### 8. Erste Anmeldung
 
@@ -399,6 +402,18 @@ node --env-file=.env sync-cli.js --force  # auch bei vielen fehlenden Dateien en
 Ein systemd-Timer für den nächtlichen Lauf liegt in `deploy/`. In der App lässt sich der Abgleich unter „Nutzer“ manuell starten.
 
 Wurden Dateien außerhalb von Nextcloud verändert, muss Nextcloud sie neu einlesen. Dafür dient `NEXTCLOUD_SCAN_CMD`, bei Gruppenordnern z. B. `occ groupfolders:scan`.
+
+### Altarchive aufräumen (einmalig)
+
+`server/dedupe-auto.js` räumt nach dem ersten Import Dubletten in Altarchiven auf: Pro Gruppe bleibt eine Datei, die übrigen gehen in den Papierkorb der App (rückholbar). Welche Ordner als Altarchive gelten und welche bei Dubletten immer verlieren, steht am Anfang des Skripts (`PRIO`, `LOSE`). Das ist auf die Ordner der Schule zugeschnitten und vor der Verwendung anzupassen. Ohne `--run` ist es ein Trockenlauf:
+
+```bash
+cd /opt/fotos/server
+sudo -u www-data node --env-file=.env dedupe-auto.js          # Trockenlauf
+sudo -u www-data node --env-file=.env dedupe-auto.js --run    # ausführen
+```
+
+Danach den Abgleich einmal starten, damit Nextcloud die entfernten Dateien mitbekommt.
 
 ## Autor
 
