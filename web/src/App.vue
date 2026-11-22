@@ -31,10 +31,13 @@ onMounted(() => auth.load())
         <RouterView v-else-if="route.meta.public" />
         <div v-else class="login">
           <h1>Schulfotos</h1>
-          <p>Anmeldung mit dem Schulkonto (@bkrheinbach.de)</p>
+          <p>Anmeldung mit dem Schulkonto (&lt;user&gt;@bkrheinbach.de)</p>
           <p v-if="loginMsg === 'denied'" class="err">Dieses Konto hat keinen Zugang.</p>
           <p v-else-if="loginMsg === 'failed'" class="err">Anmeldung fehlgeschlagen.</p>
           <a class="btn" href="/api/auth/login">Mit Microsoft anmelden</a>
+	  <p> Beachten Sie: Dieser Zugang ist nur für Kolleginnen und
+          Kollegen möglich. Er nutzt denselben Datenbestand wie die
+          GFSCloud/Fotos</p>
         </div>
       </template>
     </div>
@@ -94,7 +97,7 @@ onMounted(() => auth.load())
   cursor: pointer;
 }
 .login {
-  max-width: 24rem;
+  max-width: 50vw;
   margin: 15vh auto;
   padding: 2rem;
   text-align: center;
