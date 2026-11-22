@@ -85,7 +85,7 @@ function searchParts(qs) {
     const w = w0.slice(0, 60);
     const like = `%${w.replace(/[\\%_]/g, '\\$&')}%`;
     const or = [
-      'p.rel_path LIKE ?',
+      'p.rel_path COLLATE utf8mb4_general_ci LIKE ?',
       'p.photographer LIKE ?',
       'EXISTS (SELECT 1 FROM photo_tags sx JOIN tags st ON st.id = sx.tag_id WHERE sx.photo_id = p.id AND st.active = 1 AND st.name LIKE ?)',
     ];
