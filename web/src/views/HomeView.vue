@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { usePhotosStore } from '@/stores/photos'
-import EditDialog from '@/components/EditDialog.vue'
+import PhotoEditDialog from '@/components/PhotoEditDialog.vue'
 import { useAuth } from '@/stores/auth'
 
 const store = usePhotosStore()
@@ -429,7 +429,7 @@ function groupOpen(g) {
       </p>
     </div>
 
-    <EditDialog v-if="editIds" :photos="editPhotos" @close="editIds = null" @saved="onSaved" />
+    <PhotoEditDialog v-if="editIds" :photos="editPhotos" @close="editIds = null" @saved="onSaved" />
   </div>
 </template>
 
