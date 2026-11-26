@@ -50,6 +50,7 @@ export function makeAuth(pool) {
         scope: 'openid profile email',
         code_challenge: await client.calculatePKCECodeChallenge(verifier),
         code_challenge_method: 'S256',
+        prompt: 'select_account',
         state,
         nonce,
       })
