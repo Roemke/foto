@@ -39,6 +39,8 @@ CREATE TABLE `photos` (
   `photographer` varchar(100) DEFAULT NULL,
   `indexed_at` datetime NOT NULL DEFAULT current_timestamp(),
   `orig_hash` char(64) DEFAULT NULL,
+  `uploaded_by` varchar(255) DEFAULT NULL,
+  `uploaded_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_path` (`rel_path`),
   KEY `idx_taken` (`taken_at`),
