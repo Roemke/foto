@@ -62,6 +62,13 @@ function savePhotographer() {
   if (v) save({ photographer: v })
 }
 
+function onToggle(id, e) {
+  const next = new Set(openIds.value)
+  if (e.target.open) next.add(id)
+  else next.delete(id)
+  openIds.value = next
+}
+
 function onKey(e) {
   if (e.key === 'Escape') emit('close')
 }
@@ -116,7 +123,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         <h3>Fotograf <small>(für alle Fotos, speichert beim Verlassen des Felds)</small></h3>
         <input v-model="photographer" placeholder="Name" @change="savePhotographer" />
         <h3>Tags <small>(ein Klick setzt oder entfernt sofort)</small></h3>
-        <details v-for="g in visibleGroups" :key="g.id" :open="openIds.has(g.id)">
+        <details
+          v-for="g in visibleGroups"
+          :key="g.id"
+          :open="openIds.has(g.id)"
+          @toggle="onToggle(g.id, $event)"
+        >
           <summary>{{ g.name }}</summary>
           <div class="row">
             <button
@@ -235,9 +247,15 @@ h3 small {
   color: #fff;
 }
 .status {
+  position: sticky;
+  bottom: 0;
+  margin: 0.8rem 0 0;
+  padding: 0.5rem 0;
   min-height: 1.2em;
   text-align: center;
   color: #14612c;
+  background: #fff;
+  border-top: 1px solid #eef0f4;
 }
 .err {
   color: #b42318;
