@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
-import EditDialog from '@/components/EditDialog.vue'
+import UploadEditDialog from '@/components/UploadEditDialog.vue'
 
 const files = ref([])
 const anlass = ref('')
@@ -272,7 +272,7 @@ async function send() {
           : 'Fotos werden verarbeitet, bitte warten …'
       }}</small>
     </div>
-    <EditDialog v-if="showEdit" :photos="uploaded" @close="showEdit = false" />
+    <UploadEditDialog v-if="showEdit" :photos="uploaded" @close="showEdit = false" />
   </main>
 </template>
 

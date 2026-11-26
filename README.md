@@ -419,8 +419,30 @@ Danach den Abgleich einmal starten, damit Nextcloud die entfernten Dateien mitbe
 
 ## Autor
 
-Karsten Römke. Das Projekt ist mit sehr starker Unterstützung von Claude (Anthropic) entstanden: Konzept, Code und Dokumentation wurden im Dialog mit Claude entwickelt.
+Karsten Römke. Das Projekt ist mit starker Unterstützung von Claude (Anthropic) entstanden: Konzept, Code und Dokumentation wurden im Dialog mit Claude entwickelt.
 
 ## Lizenz
 
 MIT, siehe [LICENSE](LICENSE).
+
+## Entwicklung starten
+
+Zwei Terminals auf dem Entwicklungsrechner.
+
+Server (Port 3000, lädt `server/.env`, startet bei Änderungen neu):
+
+```bash
+cd server
+node --env-file=.env --watch index.js
+```
+
+Oberfläche (Vite, leitet `/api` an `127.0.0.1:3000` weiter):
+
+```bash
+cd web
+npm run dev
+```
+
+Danach die von Vite ausgegebene Adresse öffnen, meist `http://localhost:5173`.
+
+Der Server hat kein `dev`- oder `start`-Skript in der `package.json`. In der Produktion startet ihn `schulfotos.service`.
