@@ -68,7 +68,7 @@ app.use('/api/auth', authRouter);
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api', requireLogin);
 app.use('/api/upload', makeUploadRouter(pool));
-app.use('/api/edit', requireAdmin, makeEditRouter(pool));
+app.use('/api/edit', makeEditRouter(pool));
 app.use('/api/admin', requireAdmin, makeAdminRouter(pool));
 app.use('/api/trash', requireAdmin, makeTrashRouter(pool));
 app.use('/api/users', requireAdmin, makeUsersRouter(pool));

@@ -6,6 +6,7 @@ import path from 'node:path';
 
 const run = promisify(execFile);
 const ROOT = process.env.PHOTO_ROOT;
+const EDIT_DAYS = 7; // Nicht-Admins: eigene Uploads dieser letzten Tage
 const ids = (v) =>
   (Array.isArray(v) ? v : []).map(Number).filter((n) => Number.isInteger(n) && n > 0);
 
@@ -28,6 +29,16 @@ export function makeEditRouter(pool) {
     }
     if (!photoIds.length || photoIds.length > 500) {
       return res.status(400).json({ error: 'Ungültige Auswahl (1 bis 500 Fotos)' });
+    }
+    if (!req.user) return res.status(401).json({ error: 'nicht angemeldet' });
+    if (req.user.role !== 'admin') {
+      const [own] = await pool.query(
+        'SELECT COUNT(*) AS n FROM photos WHERE id IN (?) AND uploaded_by = ? AND uploaded_at > NOW() - INTERVAL ? DAY',
+        [photoIds, req.session?.email ?? '', EDIT_DAYS],
+      );
+      if (Number(own[0].n) !== new Set(photoIds).size) {
+        return res.status(403).json({ error: `Nur eigene Uploads der letzten ${EDIT_DAYS} Tage` });
+      }
     }
     const hasPhotog = req.body.photographer !== undefined;
     const photog = hasPhotog

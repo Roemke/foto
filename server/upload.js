@@ -44,8 +44,8 @@ const FIELDS = [
   '-HierarchicalSubject', '-Subject', '-Keywords',
 ];
 const INSERT_SQL = `INSERT INTO photos
-  (rel_path, file_name, width, height, file_size, file_mtime, taken_at, date_source, date_precision, rating, photographer, orig_hash)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  (rel_path, file_name, width, height, file_size, file_mtime, taken_at, date_source, date_precision, rating, photographer, orig_hash, uploaded_by, uploaded_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
 
 const upload = multer({ dest: TMP, limits: { files: MAX_FILES, fileSize: MAX_UPLOAD_BYTES } });
 const list = (v) => (v == null ? [] : Array.isArray(v) ? v : [v]);
@@ -245,6 +245,7 @@ export function makeUploadRouter(pool) {
           const [r] = await pool.query(INSERT_SQL, [
             rel, path.basename(dest), it.ImageWidth ?? null, it.ImageHeight ?? null,
             st.size, st.mtime, taken, src, 'day', rating, photographer, hash,
+            req.session?.email ?? null,
           ]);
           id = r.insertId;
         } catch (e) {
@@ -263,7 +264,7 @@ export function makeUploadRouter(pool) {
             tagInfo.map((t) => [id, t.id]),
           ]);
         }
-        return { name: inp.name, rel, taken, source: src };
+        return { name: inp.name, rel, taken, source: src, id };
       }
 
       const files = [...skipped];

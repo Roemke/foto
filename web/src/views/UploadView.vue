@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import EditDialog from '@/components/EditDialog.vue'
 
 const files = ref([])
 const anlass = ref('')
@@ -11,6 +12,8 @@ const selected = ref(new Set())
 const busy = ref(false)
 const result = ref(null)
 const resEl = ref(null)
+const uploaded = ref([])
+const showEdit = ref(false)
 const error = ref('')
 const drag = ref(false)
 const progress = ref(0)
@@ -117,6 +120,7 @@ async function send() {
   busy.value = true
   error.value = ''
   result.value = null
+  uploaded.value = []
   const fd = new FormData()
   fd.append('anlass', anlass.value)
   fd.append('photographer', photographer.value)
@@ -133,6 +137,12 @@ async function send() {
     } else {
       result.value = j
       files.value = []
+      const chosen = groups.value.flatMap((g) =>
+        g.tags
+          .filter((t) => selected.value.has(t.id))
+          .map((t) => ({ group: g.name, name: t.name })),
+      )
+      uploaded.value = (j.files ?? []).filter((f) => f.id).map((f) => ({ id: f.id, tags: chosen }))
       loadTags()
       await nextTick()
       resEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -215,6 +225,9 @@ async function send() {
           >, {{ result.failed }} fehlgeschlagen</span
         >
       </h2>
+      <button v-if="uploaded.length" class="edit" type="button" @click="showEdit = true">
+        Sterne, Datum und Tags bearbeiten
+      </button>
       <ul>
         <li v-for="(f, i) in result.files" :key="i" :class="{ bad: f.error }">
           {{ f.name }} → {{ f.error ?? f.rel ?? 'bereits vorhanden: ' + f.duplicate }}
@@ -259,6 +272,7 @@ async function send() {
           : 'Fotos werden verarbeitet, bitte warten …'
       }}</small>
     </div>
+    <EditDialog v-if="showEdit" :photos="uploaded" @close="showEdit = false" />
   </main>
 </template>
 
@@ -270,6 +284,15 @@ async function send() {
 }
 .res {
   scroll-margin-top: 4rem;
+}
+.edit {
+  margin: 0.4rem 0 0.8rem;
+  border: none;
+  border-radius: 999px;
+  padding: 0.5rem 1.2rem;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
 }
 .drop {
   border: 2px dashed #c5cbd6;
