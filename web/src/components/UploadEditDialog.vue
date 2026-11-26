@@ -1,15 +1,11 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import RatePhotos from '@/components/RatePhotos.vue'
 
 const props = defineProps({ photos: { type: Array, required: true } })
 const emit = defineEmits(['close'])
 
 const tab = ref('stars')
-const i = ref(0)
-const ratings = ref({})
-const error = ref('')
-const cur = computed(() => props.photos[i.value])
-
 const groups = ref([])
 const applied = ref(new Set())
 const openIds = ref(new Set())
@@ -66,58 +62,8 @@ function savePhotographer() {
   if (v) save({ photographer: v })
 }
 
-async function loadRating(p) {
-  if (!p || ratings.value[p.id] !== undefined) return
-  let v = 0
-  try {
-    const r = await fetch(`/api/photos/${p.id}`)
-    if (r.ok) v = (await r.json()).rating ?? 0
-  } catch {
-    // Anzeige bleibt bei 0
-  }
-  ratings.value = { ...ratings.value, [p.id]: v }
-}
-
-watch(
-  i,
-  () => {
-    loadRating(cur.value)
-    const next = props.photos[i.value + 1]
-    if (next) new Image().src = `/api/photos/${next.id}/thumb?size=1600`
-  },
-  { immediate: true },
-)
-
-function go(d) {
-  const n = i.value + d
-  if (n >= 0 && n < props.photos.length) i.value = n
-}
-
-async function setRating(n) {
-  const p = cur.value
-  if (!p) return
-  const old = ratings.value[p.id] ?? 0
-  ratings.value = { ...ratings.value, [p.id]: n }
-  error.value = ''
-  try {
-    const r = await fetch('/api/edit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: [p.id], rating: n }),
-    })
-    if (!r.ok) throw new Error((await r.json()).error || 'Fehler beim Speichern')
-  } catch (e) {
-    ratings.value = { ...ratings.value, [p.id]: old }
-    error.value = e.message || 'Verbindung fehlgeschlagen'
-  }
-}
-
 function onKey(e) {
   if (e.key === 'Escape') emit('close')
-  else if (tab.value !== 'stars') return
-  else if (e.key === 'ArrowRight') go(1)
-  else if (e.key === 'ArrowLeft') go(-1)
-  else if (/^[0-5]$/.test(e.key)) setRating(Number(e.key))
 }
 onMounted(async () => {
   window.addEventListener('keydown', onKey)
@@ -133,11 +79,10 @@ onMounted(async () => {
   const open = new Set()
   for (const g of groups.value) {
     for (const t of g.tags) {
-      if (
-        props.photos.every((p) =>
-          (p.tags ?? []).some((x) => x.group === g.name && x.name === t.name),
-        )
-      ) {
+      const all = props.photos.every((p) =>
+        (p.tags ?? []).some((x) => x.group === g.name && x.name === t.name),
+      )
+      if (all) {
         on.add(t.id)
         open.add(g.id)
       }
@@ -163,28 +108,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         </button>
       </nav>
 
-      <div v-if="tab === 'stars' && cur">
-        <img class="pic" :src="`/api/photos/${cur.id}/thumb?size=1600`" alt="" />
-        <div class="nav">
-          <button :disabled="i === 0" @click="go(-1)">‹</button>
-          <span>{{ i + 1 }} / {{ photos.length }}</span>
-          <button :disabled="i === photos.length - 1" @click="go(1)">›</button>
-        </div>
-        <div class="starrow">
-          <button
-            v-for="n in 5"
-            :key="n"
-            class="s"
-            :class="{ on: (ratings[cur.id] ?? 0) >= n }"
-            @click="setRating(n)"
-          >
-            ★
-          </button>
-          <button @click="setRating(0)">keine</button>
-        </div>
-        <p class="hint">Pfeiltasten blättern, Tasten 1–5 vergeben Sterne, 0 entfernt sie.</p>
-        <p v-if="error" class="err">{{ error }}</p>
-      </div>
+      <RatePhotos v-if="tab === 'stars'" :photos="photos" />
 
       <div v-else class="pane">
         <h3>Aufnahmedatum <small>(für alle Fotos, speichert beim Verlassen des Felds)</small></h3>
@@ -252,9 +176,7 @@ h2 {
   gap: 0.3rem;
   margin: 0.8rem 0;
 }
-.tabs button,
-.nav button,
-.starrow button {
+.tabs button {
   border: 1px solid transparent;
   background: #eef0f4;
   border-radius: 999px;
@@ -262,48 +184,9 @@ h2 {
   cursor: pointer;
   font-size: 0.9rem;
 }
-.tabs button.on,
-.starrow button.on {
+.tabs button.on {
   background: var(--accent);
   color: #fff;
-}
-.nav button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-.pic {
-  display: block;
-  width: 100%;
-  max-height: 60vh;
-  object-fit: contain;
-  background: #f3f4f6;
-  border-radius: 10px;
-}
-.nav {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 1rem;
-  margin: 0.6rem 0;
-}
-.starrow {
-  display: flex;
-  justify-content: center;
-  gap: 0.4rem;
-  margin: 0.4rem 0;
-}
-.starrow .s {
-  font-size: 1.5rem;
-  padding: 0.2rem 0.7rem;
-}
-.hint {
-  text-align: center;
-  color: #6b7280;
-  font-size: 0.85rem;
-}
-.err {
-  color: #b42318;
-  text-align: center;
 }
 h3 {
   font-size: 0.75rem;
@@ -355,5 +238,8 @@ h3 small {
   min-height: 1.2em;
   text-align: center;
   color: #14612c;
+}
+.err {
+  color: #b42318;
 }
 </style>

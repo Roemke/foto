@@ -1,10 +1,12 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import RatePhotos from '@/components/RatePhotos.vue'
 
 const props = defineProps({ photos: { type: Array, required: true } })
 const emit = defineEmits(['close', 'saved'])
 
 const groups = ref([])
+const tab = ref('tags')
 const state = ref({})
 const rating = ref(null)
 const date = ref('')
@@ -92,6 +94,10 @@ const changed = computed(
     clearPhotog.value,
 )
 
+function onRated(e) {
+  emit('saved', { ids: [e.id], rating: e.rating, adds: [], removes: [] })
+}
+
 async function save() {
   busy.value = true
   error.value = ''
@@ -144,55 +150,65 @@ async function save() {
         <button class="x" @click="emit('close')">✕</button>
       </header>
 
-      <h3>Sterne</h3>
-      <div class="row">
-        <button
-          v-for="o in ratingOptions"
-          :key="o.l"
-          :class="{ on: rating === o.v }"
-          @click="rating = o.v"
-        >
-          {{ o.l }}
+      <nav class="tabs">
+        <button :class="{ on: tab === 'tags' }" @click="tab = 'tags'">
+          Tags &amp; Datum (alle)
         </button>
-      </div>
+        <button :class="{ on: tab === 'stars' }" @click="tab = 'stars'">Sterne (einzeln)</button>
+      </nav>
 
-      <h3>Aufnahmedatum <small>(leer = unverändert)</small></h3>
-      <div class="row">
-        <input v-model="date" type="date" />
-      </div>
-
-      <h3>Fotograf <small>(leer = unverändert)</small></h3>
-      <div class="row">
-        <input v-model="photographer" :disabled="clearPhotog" placeholder="Name" />
-        <label class="chk"
-          ><input v-model="clearPhotog" type="checkbox" /> Fotograf entfernen</label
-        >
-      </div>
-
-      <h3>Tags <small>(Klick wechselt: hinzufügen +, entfernen −, unverändert)</small></h3>
-      <details v-for="g in groups" :key="g.id" :open="groupOpen(g)">
-        <summary>{{ g.name }}</summary>
+      <template v-if="tab === 'tags'">
+        <h3>Sterne für alle gewählten</h3>
         <div class="row">
           <button
-            v-for="t in g.tags"
-            :key="t.id"
-            type="button"
-            :class="['tag', mode(g, t), { legacy: t.legacy }]"
-            @click="click(g, t)"
+            v-for="o in ratingOptions"
+            :key="o.l"
+            :class="{ on: rating === o.v }"
+            @click="rating = o.v"
           >
-            {{ label(g, t) }}
+            {{ o.l }}
           </button>
         </div>
-      </details>
 
-      <p v-if="error" class="err">{{ error }}</p>
-      <p v-if="warn" class="err">{{ warn }}</p>
-      <footer>
-        <button @click="emit('close')">{{ warn ? 'Schließen' : 'Abbrechen' }}</button>
-        <button class="go" :disabled="!changed || busy" @click="save">
-          {{ busy ? 'Speichere …' : 'Speichern' }}
-        </button>
-      </footer>
+        <h3>Aufnahmedatum <small>(leer = unverändert)</small></h3>
+        <div class="row">
+          <input v-model="date" type="date" />
+        </div>
+
+        <h3>Fotograf <small>(leer = unverändert)</small></h3>
+        <div class="row">
+          <input v-model="photographer" :disabled="clearPhotog" placeholder="Name" />
+          <label class="chk"
+            ><input v-model="clearPhotog" type="checkbox" /> Fotograf entfernen</label
+          >
+        </div>
+
+        <h3>Tags <small>(Klick wechselt: hinzufügen +, entfernen −, unverändert)</small></h3>
+        <details v-for="g in groups" :key="g.id" :open="groupOpen(g)">
+          <summary>{{ g.name }}</summary>
+          <div class="row">
+            <button
+              v-for="t in g.tags"
+              :key="t.id"
+              type="button"
+              :class="['tag', mode(g, t), { legacy: t.legacy }]"
+              @click="click(g, t)"
+            >
+              {{ label(g, t) }}
+            </button>
+          </div>
+        </details>
+
+        <p v-if="error" class="err">{{ error }}</p>
+        <p v-if="warn" class="err">{{ warn }}</p>
+        <footer>
+          <button @click="emit('close')">{{ warn ? 'Schließen' : 'Abbrechen' }}</button>
+          <button class="go" :disabled="!changed || busy" @click="save">
+            {{ busy ? 'Speichere …' : 'Speichern' }}
+          </button>
+        </footer>
+      </template>
+      <RatePhotos v-else :photos="photos" @rated="onRated" />
     </div>
   </div>
 </template>
@@ -216,6 +232,23 @@ async function save() {
   border-radius: 14px;
   padding: 1rem 1.2rem;
   cursor: default;
+}
+.tabs {
+  display: flex;
+  gap: 0.3rem;
+  margin: 0.8rem 0;
+}
+.tabs button {
+  border: 1px solid transparent;
+  background: #eef0f4;
+  border-radius: 999px;
+  padding: 0.3rem 0.9rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.tabs button.on {
+  background: var(--accent);
+  color: #fff;
 }
 header {
   display: flex;
