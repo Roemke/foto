@@ -460,10 +460,16 @@ Das Suchfeld oben in den Filtern durchsucht Ordner (Pfad und Dateiname), Fotogra
 - Hochgeladen werden JPEGs oder ZIP-Dateien. Eine hochgeladene Datei darf bis zu 1 GB groß sein (`MAX_UPLOAD_BYTES` in `server/upload.js`), ein einzelnes Foto in einer ZIP bis 500 MB. `adm-zip` liest die ZIP im Arbeitsspeicher, bei sehr großen ZIPs den Speicherbedarf beachten.
 - Fotos ohne erkennbares Datum (weder in den Bilddaten noch im Dateinamen) werden abgelehnt. Dafür gibt es das Feld „Datum für alle".
 - Nach dem Upload steht das Ergebnis direkt unter dem Hochladen-Knopf, die Seite scrollt dorthin.
-- Der Knopf „Sterne, Datum und Tags bearbeiten" öffnet einen Dialog für genau die hochgeladenen Fotos:
-  - Reiter „Sterne (einzeln)": ein Foto groß, Sterne per Klick oder Taste 1–5 (0 = keine), Blättern mit `‹` `›` oder Pfeiltasten. Jeder Klick speichert sofort.
-  - Reiter „Tags & Datum (alle)": gilt für alle Fotos des Uploads. Tags speichern beim Klick, Datum und Fotograf beim Verlassen des Felds.
+- Der Knopf „Sterne, Datum und Tags bearbeiten" öffnet den Bearbeiten-Dialog (siehe unten) für genau die hochgeladenen Fotos.
 - Nach einem Upload scannt die App die betroffenen Ordner in Nextcloud (siehe Variablen `NEXTCLOUD_SCAN_PATH_*`).
+
+## Bearbeiten-Dialog
+
+Derselbe Dialog dient in der Galerie (Fotos markieren, Bearbeiten) und nach dem Upload. Alles speichert sofort, es gibt kein „Speichern" und „Abbrechen". Unten steht „Gespeichert" oder die Fehlermeldung. Schließen mit ✕ oder Esc. Die Galerieliste aktualisiert sich nach jeder Änderung.
+
+- Reiter „Sterne (einzeln)": ein Foto groß, Sterne per Klick oder Taste 1–5 (0 = keine), Blättern mit `‹` `›` oder Pfeiltasten.
+- Reiter „Tags & Datum (alle)": gilt für alle gewählten Fotos. Aufnahmedatum und Fotograf (setzen oder entfernen) speichern beim Verlassen des Felds. Ein Tag, den nur ein Teil der Fotos hat, steht gestrichelt mit „2/5". Ein Klick setzt ihn für alle, ein zweiter Klick entfernt ihn bei allen. Alte Tags (`legacy`) erscheinen, wenn mindestens eines der Fotos sie hat. Aufgeklappte Gruppen bleiben offen.
+- Änderungen werden nacheinander gespeichert, nie gleichzeitig, weil `exiftool` dieselben Dateien beschreibt.
 
 ## Rechte beim Bearbeiten
 
