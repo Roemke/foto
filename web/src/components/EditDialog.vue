@@ -72,6 +72,14 @@ function label(g, t) {
 }
 
 const groupOpen = (g) => g.tags.some((t) => cnt(g, t) > 0 || state.value[t.id])
+const opened = ref(new Set())
+const isOpen = (g) => groupOpen(g) || opened.value.has(g.id)
+function onToggle(id, e) {
+  const next = new Set(opened.value)
+  if (e.target.open) next.add(id)
+  else next.delete(id)
+  opened.value = next
+}
 
 function collect(kind) {
   const out = []
@@ -184,7 +192,7 @@ async function save() {
         </div>
 
         <h3>Tags <small>(Klick wechselt: hinzufügen +, entfernen −, unverändert)</small></h3>
-        <details v-for="g in groups" :key="g.id" :open="groupOpen(g)">
+        <details v-for="g in groups" :key="g.id" :open="isOpen(g)" @toggle="onToggle(g.id, $event)">
           <summary>{{ g.name }}</summary>
           <div class="row">
             <button
