@@ -1,10 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
-const props = defineProps({
-  photos: { type: Array, required: true },
-  embedded: { type: Boolean, default: false },
-})
+const props = defineProps({ photos: { type: Array, required: true } })
 const emit = defineEmits(['close', 'saved'])
 
 const groups = ref([])
@@ -37,7 +34,7 @@ const counts = computed(() => {
 const cnt = (g, t) => counts.value.get(g.name + '\u0000' + t.name) ?? 0
 
 function onEsc(e) {
-  if (!props.embedded && e.key === 'Escape') emit('close')
+  if (e.key === 'Escape') emit('close')
 }
 onMounted(async () => {
   window.addEventListener('keydown', onEsc)
@@ -140,9 +137,9 @@ async function save() {
 </script>
 
 <template>
-  <div :class="embedded ? 'emb' : 'bk'" @click.self="!embedded && emit('close')">
+  <div class="bk" @click.self="emit('close')">
     <div class="dlg" @click.stop>
-      <header v-if="!embedded">
+      <header>
         <h2>{{ n }} {{ n === 1 ? 'Foto' : 'Fotos' }} bearbeiten</h2>
         <button class="x" @click="emit('close')">✕</button>
       </header>
@@ -219,12 +216,6 @@ async function save() {
   border-radius: 14px;
   padding: 1rem 1.2rem;
   cursor: default;
-}
-.emb .dlg {
-  width: auto;
-  max-height: none;
-  overflow: visible;
-  padding: 0;
 }
 header {
   display: flex;
