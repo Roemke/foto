@@ -446,3 +446,41 @@ npm run dev
 Danach die von Vite ausgegebene Adresse öffnen, meist `http://localhost:5173`.
 
 Der Server hat kein `dev`- oder `start`-Skript in der `package.json`. In der Produktion startet ihn `schulfotos.service`.
+
+## Suche in der Galerie
+
+Das Suchfeld oben in den Filtern durchsucht Ordner (Pfad und Dateiname), Fotograf, aktive Tags und das Aufnahmedatum, ohne Beachtung der Groß-/Kleinschreibung. Mehrere Wörter gelten zusammen (UND), höchstens 8.
+
+- Datum: `2024` (Jahr), `11.2024` oder `2024-11` (Monat), `03.11.2024` (Tag).
+- Eine neue Suche durchsucht alle Jahre und setzt die Datumsfelder auf den Zeitraum der Treffer. Danach lässt sich der Zeitraum ändern, die Suche gilt dann nur dort. Erst ein geänderter Suchbegriff setzt den Zeitraum neu.
+- Wird das Suchfeld geleert, kommt der Zeitraum von vor der Suche zurück. „Filter zurücksetzen" leert auch das Suchfeld.
+
+## Upload
+
+- Hochgeladen werden JPEGs oder ZIP-Dateien. Eine hochgeladene Datei darf bis zu 1 GB groß sein (`MAX_UPLOAD_BYTES` in `server/upload.js`), ein einzelnes Foto in einer ZIP bis 500 MB. `adm-zip` liest die ZIP im Arbeitsspeicher, bei sehr großen ZIPs den Speicherbedarf beachten.
+- Fotos ohne erkennbares Datum (weder in den Bilddaten noch im Dateinamen) werden abgelehnt. Dafür gibt es das Feld „Datum für alle".
+- Nach dem Upload steht das Ergebnis direkt unter dem Hochladen-Knopf, die Seite scrollt dorthin.
+- Der Knopf „Sterne, Datum und Tags bearbeiten" öffnet einen Dialog für genau die hochgeladenen Fotos:
+  - Reiter „Sterne (einzeln)": ein Foto groß, Sterne per Klick oder Taste 1–5 (0 = keine), Blättern mit `‹` `›` oder Pfeiltasten. Jeder Klick speichert sofort.
+  - Reiter „Tags & Datum (alle)": gilt für alle Fotos des Uploads. Tags speichern beim Klick, Datum und Fotograf beim Verlassen des Felds.
+- Nach einem Upload scannt die App die betroffenen Ordner in Nextcloud (siehe Variablen `NEXTCLOUD_SCAN_PATH_*`).
+
+## Rechte beim Bearbeiten
+
+- Admins bearbeiten alle Fotos in der Galerie.
+- Andere Nutzer dürfen nur Fotos bearbeiten, die sie selbst hochgeladen haben, und nur für 7 Tage nach dem Upload (`EDIT_DAYS` in `server/edit.js`). Der Server prüft das in `/api/edit` über die Spalten `uploaded_by` (E-Mail) und `uploaded_at`.
+- Fotos aus der Bridge oder dem nächtlichen Sync haben dort keinen Eintrag und lassen sich nur als Admin bearbeiten.
+
+## Nextcloud nach Löschen und Zurücklegen
+
+Nach dem Verschieben in den Papierkorb und nach dem Zurücklegen scannt die App die betroffenen Ordner in Nextcloud, im Hintergrund und nacheinander (`server/ncscan.js`). Das endgültige Leeren des Papierkorbs braucht keinen Scan, der Papierkorb liegt außerhalb von Nextcloud. Fehlgeschlagene Scans stehen im Journal (`Nextcloud-Scan fehlgeschlagen`). Änderungen über die Bridge landen erst durch den nächtlichen Sync in der Datenbank.
+
+## Bestehende Installation aktualisieren
+
+Für die Upload-Rechte braucht die Tabelle `photos` zwei neue Spalten. Vor dem Neustart des Dienstes einmal ausführen:
+
+```bash
+mysql -u schulfotos -p schulfotos -e "ALTER TABLE photos ADD COLUMN uploaded_by VARCHAR(255) NULL, ADD COLUMN uploaded_at DATETIME NULL;"
+```
+
+Danach `git pull`, `cd web && npm run build` und `systemctl restart schulfotos.service`.
